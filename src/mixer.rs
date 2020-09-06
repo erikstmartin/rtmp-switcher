@@ -1,5 +1,7 @@
 extern crate gstreamer as gst;
+extern crate gstreamer_video as gst_video;
 use super::input::Input;
+use super::output::Output;
 use gst::prelude::*;
 use std::collections::HashMap;
 use std::error::Error;
@@ -22,6 +24,7 @@ use std::fmt;
 // - Background video test src is bleeding into input (do we need the compositor?)
 // - Have mixer enforce consistent codec on output. So we can perform them only 1 time, before
 // the tee
+// - Is there a way to manually connect our inter(audio|video)src and sink?
 // - Better comments
 // - Tests (eeeeek!)
 
@@ -29,11 +32,6 @@ use std::fmt;
 // - This does not happen when our input is in the main pipeline. It only happens when the input is
 // in its own bin.
 // - The video that comes of the autovideosink is perfect..., even when input is in its own bin.
-
-pub struct Mux {
-    audio: gst::Element,
-    video: gst::Element,
-}
 
 #[derive(Debug)]
 pub struct MixerError {
@@ -70,7 +68,7 @@ pub struct Mixer {
     audio_mixer: gst::Element,
     video_mixer: gst::Element,
     inputs: HashMap<String, Input>,
-    outputs: HashMap<String, Mux>,
+    outputs: HashMap<String, Output>,
     audio_out: gst::Element,
     video_out: gst::Element,
 }
@@ -81,20 +79,75 @@ pub struct Mixer {
 // our streams. So that we can swap them out.
 impl Mixer {
     pub fn new(name: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let pipeline = gst::Pipeline::new(Some(name));
+
+        // Create Video Channel
+        let video_background = gst::ElementFactory::make("videotestsrc", Some("videotestsrc"))?;
+        video_background.set_property_from_str("pattern", "ball");
+        video_background.set_property("is-live", &true)?;
+        let video_convert = gst::ElementFactory::make("videoconvert", Some("videoconvert"))?;
+        let video_scale = gst::ElementFactory::make("videoscale", Some("videoscale"))?;
+        let video_capsfilter = gst::ElementFactory::make("capsfilter", Some("video_capsfilter"))?;
+        let video_mixer = gst::ElementFactory::make("compositor", Some("videomixer"))?;
+        let video_caps = gst::Caps::builder("video/x-raw")
+            //.field("format", &gst_video::VideoFormat::Rgba.to_str())
+            .field("framerate", &gst::Fraction::new(60, 1))
+            .build();
+        video_capsfilter.set_property("caps", &video_caps).unwrap();
+
+        let video_queue = gst::ElementFactory::make("queue", Some("videotestsrc_queue"))?;
+        let video_tee = gst::ElementFactory::make("tee", Some("videotee"))?;
+        video_tee.set_property("allow-not-linked", &true)?;
+        pipeline.add_many(&[
+            &video_background,
+            &video_convert,
+            &video_scale,
+            &video_mixer,
+            &video_capsfilter,
+            &video_queue,
+            &video_tee,
+        ])?;
+        gst::Element::link_many(&[
+            &video_background,
+            &video_convert,
+            &video_scale,
+            &video_mixer,
+            &video_capsfilter,
+            &video_queue,
+            &video_tee,
+        ])?;
+
+        let audio_background = gst::ElementFactory::make("audiotestsrc", Some("audiotestsrc"))?;
+        audio_background.set_property("volume", &0.0)?;
+        audio_background.set_property("is-live", &true)?;
+        let audio_queue = gst::ElementFactory::make("queue", Some("audiotestsrc_queue"))?;
         let audio_mixer = gst::ElementFactory::make("audiomixer", Some("audiomixer"))?;
-        let video_mixer = gst::ElementFactory::make("videomixer", Some("videomixer"))?;
+        let audio_capsfilter = gst::ElementFactory::make("capsfilter", Some("audio_capsfilter"))?;
+        let audio_caps = gst::Caps::builder("audio/x-raw")
+            .field("channels", &2)
+            .field("layout", &"interleaved")
+            .field("rate", &4800)
+            .field("format", &"S16LE")
+            .build();
+        audio_capsfilter.set_property("caps", &audio_caps).unwrap();
 
         let audio_tee = gst::ElementFactory::make("tee", Some("audiotee"))?;
         audio_tee.set_property("allow-not-linked", &true)?;
 
-        let video_tee = gst::ElementFactory::make("tee", Some("videotee"))?;
-        video_tee.set_property("allow-not-linked", &true)?;
-
-        let pipeline = gst::Pipeline::new(Some(name));
-        pipeline.add_many(&[&audio_mixer, &video_mixer, &audio_tee, &video_tee])?;
-
-        gst::Element::link_many(&[&audio_mixer, &audio_tee])?;
-        gst::Element::link_many(&[&video_mixer, &video_tee])?;
+        pipeline.add_many(&[
+            &audio_background,
+            &audio_queue,
+            &audio_mixer,
+            &audio_capsfilter,
+            &audio_tee,
+        ])?;
+        gst::Element::link_many(&[
+            &audio_background,
+            &audio_queue,
+            &audio_mixer,
+            &audio_capsfilter,
+            &audio_tee,
+        ])?;
 
         Ok(Mixer {
             name: name.to_string(),
@@ -143,77 +196,47 @@ impl Mixer {
     // Don't remove mixer element
     // release pad from mixer
 
-    // Assume this is always RTMP for now?
-    pub fn add_output(&mut self, name: &str, uri: &str) -> Result<(), Box<dyn std::error::Error>> {
-        if self.outputs.contains_key(name) {
+    pub fn add_output(&mut self, output: Output) -> Result<(), Box<dyn std::error::Error>> {
+        if self.outputs.contains_key(&output.name) {
             return Err(MixerError::new(
-                format!("Output with name '{}' already exists.", name).as_str(),
+                format!("Output with name '{}' already exists.", output.name).as_str(),
             )
             .into());
         }
 
-        // Video stream
-        let video_queue =
-            gst::ElementFactory::make("queue", Some(format!("{}_video_queue", name).as_str()))?;
-        let video_convert = gst::ElementFactory::make(
-            "videoconvert",
-            Some(format!("{}_videoconvert", name).as_str()),
+        let intervideosink = gst::ElementFactory::make(
+            "intervideosink",
+            Some(format!("{}_intervideosink", output.name).as_str()),
         )?;
-        let x264enc =
-            gst::ElementFactory::make("x264enc", Some(format!("{}_x264enc", name).as_str()))?;
-        let h264parse =
-            gst::ElementFactory::make("h264parse", Some(format!("{}_h264parse", name).as_str()))?;
-        let flvmux =
-            gst::ElementFactory::make("flvmux", Some(format!("{}_flvmux", name).as_str()))?;
-        let queue_sink =
-            gst::ElementFactory::make("queue", Some(format!("{}_queuesink", name).as_str()))?;
-        let video_sink =
-            gst::ElementFactory::make("rtmpsink", Some(format!("{}_video_sink", name).as_str()))?;
+        intervideosink.set_property("channel", &format!("{}_video_channel", output.name))?;
+        let intervideoqueue = gst::ElementFactory::make(
+            "queue",
+            Some(format!("{}_intervideoqueue", output.name).as_str()),
+        )?;
 
-        // Audio stream
-        let audio_queue =
-            gst::ElementFactory::make("queue", Some(format!("{}_audio_queue", name).as_str()))?;
-        let audioenc =
-            gst::ElementFactory::make("fdkaacenc", Some(format!("{}_fdkaacenc", name).as_str()))?;
+        let interaudiosink = gst::ElementFactory::make(
+            "interaudiosink",
+            Some(format!("{}_interaudiosink", output.name).as_str()),
+        )?;
+        interaudiosink.set_property("channel", &format!("{}_audio_channel", output.name))?;
+        let interaudioqueue = gst::ElementFactory::make(
+            "queue",
+            Some(format!("{}_interaudioqueue", output.name).as_str()),
+        )?;
 
-        video_sink.set_property("location", &uri)?;
-        flvmux.set_property_from_str("streamable", "true");
-
-        // Add elements to pipeline
         self.pipeline.add_many(&[
-            &video_queue,
-            &audio_queue,
-            //&video_convert,
-            &x264enc,
-            &h264parse,
-            &flvmux,
-            &queue_sink,
-            &video_sink,
-            &audioenc,
+            &interaudioqueue,
+            &intervideoqueue,
+            &intervideosink,
+            &interaudiosink,
         ])?;
 
-        // Link video elements
-        gst::Element::link_many(&[
-            &self.video_out,
-            &video_queue,
-            // &video_convert,
-            &x264enc,
-            &h264parse,
-            &flvmux,
-            &queue_sink,
-            &video_sink,
-        ])?;
+        // TODO: Add queue after tee
+        gst::Element::link_many(&[&self.audio_out, &interaudioqueue, &interaudiosink])?;
+        gst::Element::link_many(&[&self.video_out, &intervideoqueue, &intervideosink])?;
+        self.pipeline.add_many(&[&output.pipeline])?;
 
-        // Link audio elements
-        gst::Element::link_many(&[&self.audio_out, &audio_queue, &audioenc, &flvmux])?;
-
-        self.outputs.insert(
-            name.to_string(),
-            Mux {
-                audio: audioenc.clone(),
-                video: video_convert.clone(),
-            },
-        );
+        self.outputs.insert(output.name.to_string(), output);
 
         Ok(())
     }
@@ -225,24 +248,29 @@ impl Mixer {
             .ok_or(MixerError::new("output not found"))?;
 
         // Detach audio
-        let sink_pad = output
+        let src_pad = output
             .audio
-            .get_static_pad("sink")
-            .expect("Failed to get sink pad from audio");
+            .get_static_pad("src")
+            .expect("Failed to get src pad from audio");
 
-        self.audio_out
-            .release_request_pad(&sink_pad.get_peer().unwrap());
-        self.remove_output_elements(&output.audio);
+        //        self.audio_out
+        //            .release_request_pad(&src_pad.get_peer().unwrap());
 
         // Detach video
-        let sink_pad = output
+        let src_pad = output
             .video
-            .get_static_pad("sink")
-            .expect("Failed to get sink pad from video");
+            .get_static_pad("src")
+            .expect("Failed to get src pad from video");
 
-        self.video_out
-            .release_request_pad(&sink_pad.get_peer().unwrap());
-        self.remove_output_elements(&output.video);
+        //        self.video_out
+        //           .release_request_pad(&src_pad.get_peer().unwrap());
+
+        // Ask the Output for its audio/video (which represent the interaudiosrc/intervideosrc)
+        // Ask for the src pad
+        // As the src pad for its peer
+        // unlink
+        // After doing this for both audio and video. Then we can remove the output.pipeline from
+        // our mixer pipeline
 
         self.outputs.remove(name);
 

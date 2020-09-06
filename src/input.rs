@@ -4,8 +4,8 @@ use gst::prelude::*;
 pub struct Input {
     pub name: String,
     pub pipeline: gst::Pipeline,
-    pub audio: gst::Element,
-    pub video: gst::Pad,
+    audio: gst::Element,
+    video: gst::Element,
 }
 
 impl Input {
@@ -105,9 +105,7 @@ impl Input {
             name: name.to_string(),
             pipeline,
             audio: interaudiosink,
-            video: intervideosink
-                .get_static_pad("sink")
-                .expect("failed to get sink pad from intervideosink"),
+            video: intervideosink,
         })
     }
 }

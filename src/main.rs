@@ -1,9 +1,11 @@
 mod input;
 mod mixer;
+mod output;
 
 use gstreamer as gst;
 use input::*;
 use mixer::*;
+use output::*;
 
 fn main() {
     // Initialize GStreamer
@@ -20,9 +22,17 @@ fn main() {
         .add_input(Input::from_uri("sintel", uri).expect("Failed to build Input from uri"))
         .expect("Failed to add input");
 
+    /*
     mixer
-        .add_output("main", rtmp_uri)
+        .add_output(Output::autosink("auto2").expect("Failed to build Output from uri"))
         .expect("Failed to add output");
+
+    */
+    mixer
+        .add_output(Output::autosink("auto").expect("Failed to build Output"))
+        .expect("Failed to add output");
+
+    //mixer.remove_output("rtmp");
 
     mixer.play().expect("Error setting pipeline state to play");
 }
