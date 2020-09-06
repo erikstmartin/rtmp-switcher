@@ -22,15 +22,14 @@ fn main() {
         .add_input(Input::from_uri("sintel", uri).expect("Failed to build Input from uri"))
         .expect("Failed to add input");
 
-    /*
-    mixer
-        .add_output(Output::autosink("auto2").expect("Failed to build Output from uri"))
-        .expect("Failed to add output");
-
-    */
     mixer
         .add_output(Output::autosink("auto").expect("Failed to build Output"))
         .expect("Failed to add output");
+    mixer
+        .add_output(Output::rtmp("rtmp", rtmp_uri).expect("Failed to build Output"))
+        .expect("Failed to add output");
+    /*
+     */
 
     //mixer.remove_output("rtmp");
 

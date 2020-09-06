@@ -8,22 +8,17 @@ use std::error::Error;
 use std::fmt;
 
 // TODO:
-// - We need to ensure we have queues before N-1 elements and after 1-N elements.
 // - Inputs and Outputs may be audio only or video only.
 // - autoaudiosink does not play audio, even though it's in a playing state,
 // when used with RTMP sink
 // - Artifacting/discontinuity on RTMP feed but not autovideosink
-// - Refactor Input, Output, Mixer into different modules.
-// - Create separate bins for inputs and outputs (intervideosrc, intervideosink)
 // - Handle dynamically changing pipeline while running
 //   - Use Idle PadProbe's in order to ensure we don't unlink elements during negotiations, etc.
 //   - Block src pads until ready.
 //   - Synchronize state between bins/elements before linking.
 // - remove_input
-// - Figure out why some input videos work and others fail
-// - Background video test src is bleeding into input (do we need the compositor?)
-// - Have mixer enforce consistent codec on output. So we can perform them only 1 time, before
-// the tee
+// - fix remove_ouput
+// - Figure out why some input videos work and others fail (mismatch between sample rate of audio)
 // - Is there a way to manually connect our inter(audio|video)src and sink?
 // - Better comments
 // - Tests (eeeeek!)
@@ -58,10 +53,6 @@ impl Error for MixerError {
     }
 }
 
-// Mixer (a channel)
-// - Inputs
-// - Outputs
-/// This becomes docs?
 pub struct Mixer {
     name: String,
     pipeline: gst::Pipeline,
@@ -73,24 +64,16 @@ pub struct Mixer {
     video_out: gst::Element,
 }
 
-// TODO:
-// - We need some sort constant src to be played. The reason for this is that the pipeline will end
-// when the video completes. So we need a black screen or something to always be underneath all of
-// our streams. So that we can swap them out.
 impl Mixer {
     pub fn new(name: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let background_enabled = true;
         let pipeline = gst::Pipeline::new(Some(name));
 
         // Create Video Channel
-        let video_background = gst::ElementFactory::make("videotestsrc", Some("videotestsrc"))?;
-        video_background.set_property_from_str("pattern", "ball");
-        video_background.set_property("is-live", &true)?;
-        let video_convert = gst::ElementFactory::make("videoconvert", Some("videoconvert"))?;
-        let video_scale = gst::ElementFactory::make("videoscale", Some("videoscale"))?;
         let video_capsfilter = gst::ElementFactory::make("capsfilter", Some("video_capsfilter"))?;
         let video_mixer = gst::ElementFactory::make("compositor", Some("videomixer"))?;
         let video_caps = gst::Caps::builder("video/x-raw")
-            //.field("format", &gst_video::VideoFormat::Rgba.to_str())
+            // TODO:.field("format", &gst_video::VideoFormat::Rgba.to_str())
             .field("framerate", &gst::Fraction::new(60, 1))
             .build();
         video_capsfilter.set_property("caps", &video_caps).unwrap();
@@ -98,31 +81,10 @@ impl Mixer {
         let video_queue = gst::ElementFactory::make("queue", Some("videotestsrc_queue"))?;
         let video_tee = gst::ElementFactory::make("tee", Some("videotee"))?;
         video_tee.set_property("allow-not-linked", &true)?;
-        pipeline.add_many(&[
-            &video_background,
-            &video_convert,
-            &video_scale,
-            &video_mixer,
-            &video_capsfilter,
-            &video_queue,
-            &video_tee,
-        ])?;
-        gst::Element::link_many(&[
-            &video_background,
-            &video_convert,
-            &video_scale,
-            &video_mixer,
-            &video_capsfilter,
-            &video_queue,
-            &video_tee,
-        ])?;
 
-        let audio_background = gst::ElementFactory::make("audiotestsrc", Some("audiotestsrc"))?;
-        audio_background.set_property("volume", &0.0)?;
-        audio_background.set_property("is-live", &true)?;
-        let audio_convert = gst::ElementFactory::make("audioconvert", Some("audioconvert"))?;
-        let audio_resample = gst::ElementFactory::make("audioresample", Some("audioresample"))?;
-        let audio_queue = gst::ElementFactory::make("queue", Some("audiotestsrc_queue"))?;
+        pipeline.add_many(&[&video_mixer, &video_capsfilter, &video_queue, &video_tee])?;
+        gst::Element::link_many(&[&video_mixer, &video_capsfilter, &video_queue, &video_tee])?;
+
         let audio_mixer = gst::ElementFactory::make("audiomixer", Some("audiomixer"))?;
         let audio_capsfilter = gst::ElementFactory::make("capsfilter", Some("audio_capsfilter"))?;
         let audio_caps = gst::Caps::builder("audio/x-raw")
@@ -135,24 +97,48 @@ impl Mixer {
         let audio_tee = gst::ElementFactory::make("tee", Some("audiotee"))?;
         audio_tee.set_property("allow-not-linked", &true)?;
 
-        pipeline.add_many(&[
-            &audio_background,
-            &audio_convert,
-            &audio_resample,
-            &audio_queue,
-            &audio_mixer,
-            &audio_capsfilter,
-            &audio_tee,
-        ])?;
-        gst::Element::link_many(&[
-            &audio_background,
-            &audio_convert,
-            &audio_resample,
-            &audio_queue,
-            &audio_mixer,
-            &audio_capsfilter,
-            &audio_tee,
-        ])?;
+        pipeline.add_many(&[&audio_mixer, &audio_capsfilter, &audio_tee])?;
+        gst::Element::link_many(&[&audio_mixer, &audio_capsfilter, &audio_tee])?;
+
+        if background_enabled {
+            let video_background = gst::ElementFactory::make("videotestsrc", Some("videotestsrc"))?;
+            video_background.set_property_from_str("pattern", "ball");
+            video_background.set_property("is-live", &true)?;
+            let video_convert = gst::ElementFactory::make("videoconvert", Some("videoconvert"))?;
+            let video_scale = gst::ElementFactory::make("videoscale", Some("videoscale"))?;
+
+            let audio_background = gst::ElementFactory::make("audiotestsrc", Some("audiotestsrc"))?;
+            audio_background.set_property("volume", &0.0)?;
+            audio_background.set_property("is-live", &true)?;
+            let audio_convert = gst::ElementFactory::make("audioconvert", Some("audioconvert"))?;
+            let audio_resample = gst::ElementFactory::make("audioresample", Some("audioresample"))?;
+            let audio_queue = gst::ElementFactory::make("queue", Some("audiotestsrc_queue"))?;
+
+            pipeline.add_many(&[
+                &video_background,
+                &video_convert,
+                &video_scale,
+                &audio_background,
+                &audio_convert,
+                &audio_resample,
+                &audio_queue,
+            ])?;
+            // Link video elements
+            gst::Element::link_many(&[
+                &video_background,
+                &video_convert,
+                &video_scale,
+                &video_mixer,
+            ])?;
+            // Link audio elements
+            gst::Element::link_many(&[
+                &audio_background,
+                &audio_convert,
+                &audio_resample,
+                &audio_queue,
+                &audio_mixer,
+            ])?;
+        }
 
         Ok(Mixer {
             name: name.to_string(),

@@ -19,11 +19,11 @@ impl Input {
             "videoconvert",
             Some(format!("{}_videoconvert", name).as_str()),
         )?;
-        let intervideosink = gst::ElementFactory::make(
+        let video_intersink = gst::ElementFactory::make(
             "intervideosink",
-            Some(format!("{}_intervideosink", name).as_str()),
+            Some(format!("{}_video_intersink", name).as_str()),
         )?;
-        intervideosink.set_property("channel", &format!("{}_video_channel", name))?;
+        video_intersink.set_property("channel", &format!("{}_video_channel", name))?;
         let videoqueue =
             gst::ElementFactory::make("queue", Some(format!("{}_videoqueue", name).as_str()))?;
 
@@ -35,27 +35,27 @@ impl Input {
             "audioresample",
             Some(format!("{}_audioresample", name).as_str()),
         )?;
-        let interaudiosink = gst::ElementFactory::make(
+        let audio_intersink = gst::ElementFactory::make(
             "interaudiosink",
-            Some(format!("{}_interaudiosink", name).as_str()),
+            Some(format!("{}_audio_intersink", name).as_str()),
         )?;
-        interaudiosink.set_property("channel", &format!("{}_audio_channel", name))?;
+        audio_intersink.set_property("channel", &format!("{}_audio_channel", name))?;
         let audioqueue =
             gst::ElementFactory::make("queue", Some(format!("{}_audioqueue", name).as_str()))?;
 
         pipeline.add_many(&[
             &source,
             &videoconvert,
-            &intervideosink,
+            &video_intersink,
             &videoqueue,
             &audioconvert,
             &audioresample,
-            &interaudiosink,
+            &audio_intersink,
             &audioqueue,
         ])?;
 
-        gst::Element::link_many(&[&audioconvert, &audioresample, &audioqueue, &interaudiosink])?;
-        gst::Element::link_many(&[&videoconvert, &videoqueue, &intervideosink])?;
+        gst::Element::link_many(&[&audioconvert, &audioresample, &audioqueue, &audio_intersink])?;
+        gst::Element::link_many(&[&videoconvert, &videoqueue, &video_intersink])?;
 
         source.connect_pad_added(move |src, src_pad| {
             println!(
@@ -108,8 +108,8 @@ impl Input {
         Ok(Self {
             name: name.to_string(),
             pipeline,
-            audio: interaudiosink,
-            video: intervideosink,
+            audio: audio_intersink,
+            video: video_intersink,
         })
     }
 }
