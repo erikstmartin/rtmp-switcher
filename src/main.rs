@@ -28,8 +28,6 @@ fn main() {
     mixer
         .add_output(Output::rtmp("rtmp", rtmp_uri).expect("Failed to build Output"))
         .expect("Failed to add output");
-    /*
-     */
 
     //mixer.remove_output("rtmp");
 

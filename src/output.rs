@@ -63,7 +63,10 @@ impl Output {
             gst::ElementFactory::make("videoscale", Some(format!("{}_videoscale", name).as_str()))?;
         let video_rate =
             gst::ElementFactory::make("videorate", Some(format!("{}_videorate", name).as_str()))?;
-        let video_capsfilter = gst::ElementFactory::make("capsfilter", Some("video_capsfilter"))?;
+        let video_capsfilter = gst::ElementFactory::make(
+            "capsfilter",
+            Some(format!("{}_video_capsfilter", name).as_str()),
+        )?;
 
         let x264enc =
             gst::ElementFactory::make("x264enc", Some(format!("{}_x264enc", name).as_str()))?;
@@ -119,8 +122,14 @@ impl Output {
             Some(format!("{}_interaudiosrc", name).as_str()),
         )?;
         audio_intersrc.set_property("channel", &format!("{}_audio_channel", name))?;
-        let audio_convert = gst::ElementFactory::make("audioconvert", Some("audioconvert"))?;
-        let audio_resample = gst::ElementFactory::make("audioresample", Some("audioresample"))?;
+        let audio_convert = gst::ElementFactory::make(
+            "audioconvert",
+            Some(format!("{}_audioconvert", name).as_str()),
+        )?;
+        let audio_resample = gst::ElementFactory::make(
+            "audioresample",
+            Some(format!("{}_audioresample", name).as_str()),
+        )?;
         let audioenc =
             gst::ElementFactory::make("fdkaacenc", Some(format!("{}_fdkaacenc", name).as_str()))?;
         let aacparse =
