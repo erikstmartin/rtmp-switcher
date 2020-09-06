@@ -31,6 +31,10 @@ impl Input {
             "audioconvert",
             Some(format!("{}_audioconvert", name).as_str()),
         )?;
+        let audioresample = gst::ElementFactory::make(
+            "audioresample",
+            Some(format!("{}_audioresample", name).as_str()),
+        )?;
         let interaudiosink = gst::ElementFactory::make(
             "interaudiosink",
             Some(format!("{}_interaudiosink", name).as_str()),
@@ -45,11 +49,12 @@ impl Input {
             &intervideosink,
             &videoqueue,
             &audioconvert,
+            &audioresample,
             &interaudiosink,
             &audioqueue,
         ])?;
 
-        gst::Element::link_many(&[&audioconvert, &audioqueue, &interaudiosink])?;
+        gst::Element::link_many(&[&audioconvert, &audioresample, &audioqueue, &interaudiosink])?;
         gst::Element::link_many(&[&videoconvert, &videoqueue, &intervideosink])?;
 
         source.connect_pad_added(move |src, src_pad| {
@@ -78,7 +83,6 @@ impl Input {
 
                 let res = src_pad.link(&sink_pad);
                 if res.is_err() {
-                    dbg!(res);
                     println!("Type is {} but link failed.", new_pad_type);
                 } else {
                     println!("Link succeeded (type {}).", new_pad_type);

@@ -120,14 +120,15 @@ impl Mixer {
         let audio_background = gst::ElementFactory::make("audiotestsrc", Some("audiotestsrc"))?;
         audio_background.set_property("volume", &0.0)?;
         audio_background.set_property("is-live", &true)?;
+        let audio_convert = gst::ElementFactory::make("audioconvert", Some("audioconvert"))?;
+        let audio_resample = gst::ElementFactory::make("audioresample", Some("audioresample"))?;
         let audio_queue = gst::ElementFactory::make("queue", Some("audiotestsrc_queue"))?;
         let audio_mixer = gst::ElementFactory::make("audiomixer", Some("audiomixer"))?;
         let audio_capsfilter = gst::ElementFactory::make("capsfilter", Some("audio_capsfilter"))?;
         let audio_caps = gst::Caps::builder("audio/x-raw")
             .field("channels", &2)
             .field("layout", &"interleaved")
-            .field("rate", &4800)
-            .field("format", &"S16LE")
+            .field("format", &"S32LE")
             .build();
         audio_capsfilter.set_property("caps", &audio_caps).unwrap();
 
@@ -136,6 +137,8 @@ impl Mixer {
 
         pipeline.add_many(&[
             &audio_background,
+            &audio_convert,
+            &audio_resample,
             &audio_queue,
             &audio_mixer,
             &audio_capsfilter,
@@ -143,6 +146,8 @@ impl Mixer {
         ])?;
         gst::Element::link_many(&[
             &audio_background,
+            &audio_convert,
+            &audio_resample,
             &audio_queue,
             &audio_mixer,
             &audio_capsfilter,

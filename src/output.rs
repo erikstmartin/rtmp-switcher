@@ -12,37 +12,37 @@ impl Output {
     pub fn autosink(name: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let pipeline = gst::Pipeline::new(Some(name));
 
-        let videosink = gst::ElementFactory::make(
+        let video_sink = gst::ElementFactory::make(
             "autovideosink",
             Some(format!("{}_video_sink", name).as_str()),
         )?;
-        let intervideosrc = gst::ElementFactory::make(
+        let video_intersrc = gst::ElementFactory::make(
             "intervideosrc",
             Some(format!("{}_intervideosrc", name).as_str()),
         )?;
-        intervideosrc.set_property("channel", &format!("{}_video_channel", name))?;
+        video_intersrc.set_property("channel", &format!("{}_video_channel", name))?;
 
-        let audiosink = gst::ElementFactory::make(
+        let audio_sink = gst::ElementFactory::make(
             "autoaudiosink",
             Some(format!("{}_audio_sink", name).as_str()),
         )?;
 
-        let interaudiosrc = gst::ElementFactory::make(
+        let audio_intersrc = gst::ElementFactory::make(
             "interaudiosrc",
             Some(format!("{}_interaudiosrc", name).as_str()),
         )?;
-        interaudiosrc.set_property("channel", &format!("{}_audio_channel", name))?;
+        audio_intersrc.set_property("channel", &format!("{}_audio_channel", name))?;
 
         // Add elements to pipeline
-        pipeline.add_many(&[&audiosink, &interaudiosrc, &videosink, &intervideosrc])?;
-        gst::Element::link_many(&[&interaudiosrc, &audiosink])?;
-        gst::Element::link_many(&[&intervideosrc, &videosink])?;
+        pipeline.add_many(&[&audio_sink, &audio_intersrc, &video_sink, &video_intersrc])?;
+        gst::Element::link_many(&[&audio_intersrc, &audio_sink])?;
+        gst::Element::link_many(&[&video_intersrc, &video_sink])?;
 
         Ok(Self {
             name: name.to_string(),
             pipeline,
-            audio: interaudiosrc,
-            video: intervideosrc,
+            audio: audio_intersrc,
+            video: video_intersrc,
         })
     }
 
@@ -69,22 +69,22 @@ impl Output {
         video_sink.set_property("location", &uri)?;
         flvmux.set_property_from_str("streamable", "true");
 
-        let intervideosrc = gst::ElementFactory::make(
+        let video_intersrc = gst::ElementFactory::make(
             "intervideosrc",
             Some(format!("{}_intervideosrc", name).as_str()),
         )?;
-        intervideosrc.set_property("channel", &format!("{}_video_channel", name))?;
+        video_intersrc.set_property("channel", &format!("{}_video_channel", name))?;
 
         // Audio stream
         let audio_queue =
             gst::ElementFactory::make("queue", Some(format!("{}_audio_queue", name).as_str()))?;
         let audioenc =
             gst::ElementFactory::make("fdkaacenc", Some(format!("{}_fdkaacenc", name).as_str()))?;
-        let interaudiosrc = gst::ElementFactory::make(
+        let audio_intersrc = gst::ElementFactory::make(
             "interaudiosrc",
             Some(format!("{}_interaudiosrc", name).as_str()),
         )?;
-        interaudiosrc.set_property("channel", &format!("{}_audio_channel", name))?;
+        audio_intersrc.set_property("channel", &format!("{}_audio_channel", name))?;
 
         // Add elements to pipeline
         pipeline.add_many(&[
@@ -97,13 +97,13 @@ impl Output {
             &queue_sink,
             &video_sink,
             &audioenc,
-            &intervideosrc,
-            &interaudiosrc,
+            &video_intersrc,
+            &audio_intersrc,
         ])?;
 
         // Link video elements
         gst::Element::link_many(&[
-            &intervideosrc,
+            &video_intersrc,
             &video_queue,
             &video_convert,
             &x264enc,
@@ -114,13 +114,13 @@ impl Output {
         ])?;
 
         // Link audio elements
-        gst::Element::link_many(&[&interaudiosrc, &audio_queue, &audioenc, &flvmux])?;
+        gst::Element::link_many(&[&audio_intersrc, &audio_queue, &audioenc, &flvmux])?;
 
         Ok(Self {
             name: name.to_string(),
             pipeline,
-            audio: interaudiosrc,
-            video: intervideosrc,
+            audio: audio_intersrc,
+            video: video_intersrc,
         })
     }
 }
