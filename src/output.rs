@@ -1,60 +1,98 @@
 extern crate gstreamer as gst;
 use gst::prelude::*;
 
-pub struct Output {
-    pub name: String,
-    pub pipeline: gst::Pipeline,
-    pub audio: gst::Element,
-    pub video: gst::Element,
+type Error = Box<dyn std::error::Error>;
+
+pub trait Output {
+    fn name(&self) -> String;
+    fn link(
+        &mut self,
+        pipeline: gst::Pipeline,
+        audio: gst::Element,
+        video: gst::Element,
+    ) -> Result<(), Error>;
+    fn unlink(&self) -> Result<(), Error>;
 }
 
-impl Output {
-    pub fn autosink(name: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let pipeline = gst::Pipeline::new(Some(name));
+pub struct Auto {
+    pub name: String,
+    pipeline: Option<gst::Pipeline>,
+    videosink: gst::Element,
+    audiosink: gst::Element,
+}
 
-        let video_sink = gst::ElementFactory::make(
+impl Auto {
+    pub fn new(name: &str) -> Result<Box<dyn Output>, Box<dyn std::error::Error>> {
+        let videosink = gst::ElementFactory::make(
             "autovideosink",
             Some(format!("{}_video_sink", name).as_str()),
         )?;
-        let video_intersrc = gst::ElementFactory::make(
-            "intervideosrc",
-            Some(format!("{}_intervideosrc", name).as_str()),
-        )?;
-        video_intersrc.set_property("channel", &format!("{}_video_channel", name))?;
 
-        let audio_sink = gst::ElementFactory::make(
+        let audiosink = gst::ElementFactory::make(
             "autoaudiosink",
             Some(format!("{}_audio_sink", name).as_str()),
         )?;
 
-        let audio_intersrc = gst::ElementFactory::make(
-            "interaudiosrc",
-            Some(format!("{}_interaudiosrc", name).as_str()),
-        )?;
-        audio_intersrc.set_property("channel", &format!("{}_audio_channel", name))?;
-
-        // Add elements to pipeline
-        pipeline.add_many(&[&audio_sink, &audio_intersrc, &video_sink, &video_intersrc])?;
-        gst::Element::link_many(&[&audio_intersrc, &audio_sink])?;
-        gst::Element::link_many(&[&video_intersrc, &video_sink])?;
-
-        Ok(Self {
+        Ok(Box::new(Self {
             name: name.to_string(),
-            pipeline,
-            audio: audio_intersrc,
-            video: video_intersrc,
-        })
+            pipeline: None,
+            audiosink,
+            videosink,
+        }))
+    }
+}
+
+impl Output for Auto {
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+    fn link(
+        &mut self,
+        pipeline: gst::Pipeline,
+        audio: gst::Element,
+        video: gst::Element,
+    ) -> Result<(), Error> {
+        pipeline.add_many(&[&self.audiosink, &self.videosink])?;
+        self.pipeline = Some(pipeline);
+        gst::Element::link_many(&[&audio, &self.audiosink])?;
+        gst::Element::link_many(&[&video, &self.videosink])?;
+        Ok(())
     }
 
-    pub fn rtmp(name: &str, uri: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let pipeline = gst::Pipeline::new(Some(name));
+    fn unlink(&self) -> Result<(), Error> {
+        self.pipeline
+            .as_ref()
+            .unwrap()
+            .remove_many(&[&self.audiosink, &self.videosink])?;
 
+        Ok(())
+    }
+}
+
+pub struct RTMP {
+    pub name: String,
+    pipeline: Option<gst::Pipeline>,
+    pub video_convert: gst::Element,
+    pub video_scale: gst::Element,
+    pub video_rate: gst::Element,
+    pub video_capsfilter: gst::Element,
+    pub x264enc: gst::Element,
+    pub h264parse: gst::Element,
+    pub flvmux: gst::Element,
+    pub video_queue: gst::Element,
+    pub queue_sink: gst::Element,
+    pub video_sink: gst::Element,
+
+    pub audio_convert: gst::Element,
+    pub audio_resample: gst::Element,
+    pub audioenc: gst::Element,
+    pub aacparse: gst::Element,
+    pub audio_queue: gst::Element,
+}
+
+impl RTMP {
+    pub fn new(name: &str, uri: &str) -> Result<Box<dyn Output>, Box<dyn std::error::Error>> {
         // Video stream
-        let video_intersrc = gst::ElementFactory::make(
-            "intervideosrc",
-            Some(format!("{}_intervideosrc", name).as_str()),
-        )?;
-        video_intersrc.set_property("channel", &format!("{}_video_channel", name))?;
         let video_convert = gst::ElementFactory::make(
             "videoconvert",
             Some(format!("{}_videoconvert", name).as_str()),
@@ -86,42 +124,7 @@ impl Output {
             gst::ElementFactory::make("rtmpsink", Some(format!("{}_video_sink", name).as_str()))?;
         video_sink.set_property("location", &uri)?;
 
-        pipeline.add_many(&[
-            &video_intersrc,
-            &video_convert,
-            &video_scale,
-            &video_rate,
-            &video_capsfilter,
-            &x264enc,
-            &h264parse,
-            &video_queue,
-            &flvmux,
-            &queue_sink,
-            &video_sink,
-        ])?;
-
-        // Link video elements
-        gst::Element::link_many(&[
-            &video_intersrc,
-            &video_convert,
-            &video_scale,
-            &video_rate,
-            &video_capsfilter,
-            &x264enc,
-            &h264parse,
-            &video_queue,
-            &flvmux,
-            &queue_sink,
-            &video_sink,
-        ])?;
-
         // Audio stream
-        // interaudiosrc -> audioconvert -> audioresample
-        let audio_intersrc = gst::ElementFactory::make(
-            "interaudiosrc",
-            Some(format!("{}_interaudiosrc", name).as_str()),
-        )?;
-        audio_intersrc.set_property("channel", &format!("{}_audio_channel", name))?;
         let audio_convert = gst::ElementFactory::make(
             "audioconvert",
             Some(format!("{}_audioconvert", name).as_str()),
@@ -137,32 +140,113 @@ impl Output {
         let audio_queue =
             gst::ElementFactory::make("queue", Some(format!("{}_audio_queue", name).as_str()))?;
 
-        // Add elements to pipeline
-        pipeline.add_many(&[
-            &audio_intersrc,
-            &audio_convert,
-            &audio_resample,
-            &audioenc,
-            &aacparse,
-            &audio_queue,
-        ])?;
-
-        // Link audio elements
-        gst::Element::link_many(&[
-            &audio_intersrc,
-            &audio_convert,
-            &audio_resample,
-            &audioenc,
-            &aacparse,
-            &audio_queue,
-            &flvmux,
-        ])?;
-
-        Ok(Self {
+        Ok(Box::new(Self {
             name: name.to_string(),
-            pipeline,
-            audio: audio_intersrc,
-            video: video_intersrc,
-        })
+            pipeline: None,
+            video_convert,
+            video_scale,
+            video_rate,
+            video_capsfilter,
+            x264enc,
+            h264parse,
+            video_queue,
+            flvmux,
+            queue_sink,
+            video_sink,
+            audioenc,
+            aacparse,
+            audio_convert,
+            audio_resample,
+            audio_queue,
+        }))
+    }
+}
+
+impl Output for RTMP {
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+    fn link(
+        &mut self,
+        pipeline: gst::Pipeline,
+        audio: gst::Element,
+        video: gst::Element,
+    ) -> Result<(), Error> {
+        // Video
+        pipeline.add_many(&[
+            &self.video_convert,
+            &self.video_scale,
+            &self.video_rate,
+            &self.video_capsfilter,
+            &self.x264enc,
+            &self.h264parse,
+            &self.video_queue,
+            &self.flvmux,
+            &self.queue_sink,
+            &self.video_sink,
+        ])?;
+
+        gst::Element::link_many(&[
+            &video,
+            &self.video_convert,
+            &self.video_scale,
+            &self.video_rate,
+            &self.video_capsfilter,
+            &self.x264enc,
+            &self.h264parse,
+            &self.video_queue,
+            &self.flvmux,
+            &self.queue_sink,
+            &self.video_sink,
+        ])?;
+
+        // Audio
+        pipeline.add_many(&[
+            &self.audio_convert,
+            &self.audio_resample,
+            &self.audioenc,
+            &self.aacparse,
+            &self.audio_queue,
+        ])?;
+
+        gst::Element::link_many(&[
+            &audio,
+            &self.audio_convert,
+            &self.audio_resample,
+            &self.audioenc,
+            &self.aacparse,
+            &self.audio_queue,
+            &self.flvmux,
+        ])?;
+
+        self.pipeline = Some(pipeline);
+
+        Ok(())
+    }
+
+    fn unlink(&self) -> Result<(), Error> {
+        let pipeline = self.pipeline.as_ref().unwrap();
+        pipeline.remove_many(&[
+            &self.video_convert,
+            &self.video_scale,
+            &self.video_rate,
+            &self.video_capsfilter,
+            &self.x264enc,
+            &self.h264parse,
+            &self.video_queue,
+            &self.flvmux,
+            &self.queue_sink,
+            &self.video_sink,
+        ])?;
+
+        pipeline.remove_many(&[
+            &self.audio_convert,
+            &self.audio_resample,
+            &self.audioenc,
+            &self.aacparse,
+            &self.audio_queue,
+        ])?;
+
+        Ok(())
     }
 }

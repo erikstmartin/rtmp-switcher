@@ -16,10 +16,7 @@ use std::fmt;
 //   - Use Idle PadProbe's in order to ensure we don't unlink elements during negotiations, etc.
 //   - Block src pads until ready.
 //   - Synchronize state between bins/elements before linking.
-// - remove_input
-// - fix remove_ouput
 // - Figure out why some input videos work and others fail (mismatch between sample rate of audio)
-// - Is there a way to manually connect our inter(audio|video)src and sink?
 // - Better comments
 // - Tests (eeeeek!)
 
@@ -58,8 +55,8 @@ pub struct Mixer {
     pipeline: gst::Pipeline,
     audio_mixer: gst::Element,
     video_mixer: gst::Element,
-    inputs: HashMap<String, Input>,
-    outputs: HashMap<String, Output>,
+    inputs: HashMap<String, Box<dyn Input>>,
+    outputs: HashMap<String, Box<dyn Output>>,
     audio_out: gst::Element,
     video_out: gst::Element,
 }
@@ -102,7 +99,7 @@ impl Mixer {
 
         if background_enabled {
             let video_background = gst::ElementFactory::make("videotestsrc", Some("videotestsrc"))?;
-            video_background.set_property_from_str("pattern", "ball");
+            video_background.set_property_from_str("pattern", "black");
             video_background.set_property("is-live", &true)?;
             let video_convert = gst::ElementFactory::make("videoconvert", Some("videoconvert"))?;
             let video_scale = gst::ElementFactory::make("videoscale", Some("videoscale"))?;
@@ -152,117 +149,78 @@ impl Mixer {
         })
     }
 
-    pub fn add_input(&mut self, input: Input) -> Result<(), Box<dyn std::error::Error>> {
-        if self.inputs.contains_key(&input.name) {
+    pub fn add_input(
+        &mut self,
+        mut input: Box<dyn Input>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if self.inputs.contains_key(&input.name()) {
             return Err(MixerError::new(
-                format!("Input with name '{}' already exists.", input.name).as_str(),
+                format!("Input with name '{}' already exists.", input.name()).as_str(),
             )
             .into());
         }
 
-        let intervideosrc = gst::ElementFactory::make(
-            "intervideosrc",
-            Some(format!("{}_intervideosrc", input.name).as_str()),
+        input.link(
+            self.pipeline.clone(),
+            self.audio_mixer.clone(),
+            self.video_mixer.clone(),
         )?;
-        intervideosrc.set_property("channel", &format!("{}_video_channel", input.name))?;
 
-        let interaudiosrc = gst::ElementFactory::make(
-            "interaudiosrc",
-            Some(format!("{}_interaudiosrc", input.name).as_str()),
-        )?;
-        interaudiosrc.set_property("channel", &format!("{}_audio_channel", input.name))?;
-
-        self.pipeline.add_many(&[&input.pipeline])?;
-        self.pipeline.add_many(&[&intervideosrc, &interaudiosrc])?;
-        gst::Element::link_many(&[&interaudiosrc, &self.audio_mixer])?;
-        gst::Element::link_many(&[&intervideosrc, &self.video_mixer])?;
-
-        self.inputs.insert(input.name.to_string(), input);
+        self.inputs.insert(input.name(), input);
 
         Ok(())
     }
 
-    // TODO:  remove_input
     // traverse pads->peers until we hit audio or video mixer.
     // Don't remove mixer element
     // release pad from mixer
-
-    pub fn add_output(&mut self, output: Output) -> Result<(), Box<dyn std::error::Error>> {
-        if self.outputs.contains_key(&output.name) {
+    pub fn remove_input(&mut self, name: &str) -> Result<(), Box<dyn std::error::Error>> {
+        if !self.inputs.contains_key(name) {
             return Err(MixerError::new(
-                format!("Output with name '{}' already exists.", output.name).as_str(),
+                format!("Input with name '{}' doesn't exist.", name).as_str(),
             )
             .into());
         }
 
-        let intervideosink = gst::ElementFactory::make(
-            "intervideosink",
-            Some(format!("{}_intervideosink", output.name).as_str()),
-        )?;
-        intervideosink.set_property("channel", &format!("{}_video_channel", output.name))?;
-        let intervideoqueue = gst::ElementFactory::make(
-            "queue",
-            Some(format!("{}_intervideoqueue", output.name).as_str()),
+        let input = self.inputs.get_mut(name).unwrap();
+        input.unlink()?;
+        self.inputs.remove(name);
+
+        Ok(())
+    }
+
+    pub fn add_output(
+        &mut self,
+        mut output: Box<dyn Output>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if self.outputs.contains_key(&output.name()) {
+            return Err(MixerError::new(
+                format!("Output with name '{}' already exists.", output.name()).as_str(),
+            )
+            .into());
+        }
+
+        output.link(
+            self.pipeline.clone(),
+            self.audio_out.clone(),
+            self.video_out.clone(),
         )?;
 
-        let interaudiosink = gst::ElementFactory::make(
-            "interaudiosink",
-            Some(format!("{}_interaudiosink", output.name).as_str()),
-        )?;
-        interaudiosink.set_property("channel", &format!("{}_audio_channel", output.name))?;
-        let interaudioqueue = gst::ElementFactory::make(
-            "queue",
-            Some(format!("{}_interaudioqueue", output.name).as_str()),
-        )?;
-
-        self.pipeline.add_many(&[
-            &interaudioqueue,
-            &intervideoqueue,
-            &intervideosink,
-            &interaudiosink,
-        ])?;
-
-        // TODO: Add queue after tee
-        gst::Element::link_many(&[&self.audio_out, &interaudioqueue, &interaudiosink])?;
-        gst::Element::link_many(&[&self.video_out, &intervideoqueue, &intervideosink])?;
-        self.pipeline.add_many(&[&output.pipeline])?;
-
-        self.outputs.insert(output.name.to_string(), output);
+        self.outputs.insert(output.name(), output);
 
         Ok(())
     }
 
     pub fn remove_output(&mut self, name: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let output = self
-            .outputs
-            .get(&name.to_string())
-            .ok_or(MixerError::new("output not found"))?;
+        if !self.outputs.contains_key(name) {
+            return Err(MixerError::new(
+                format!("Output with name '{}' doesn't exist.", name).as_str(),
+            )
+            .into());
+        }
 
-        // Detach audio
-        let src_pad = output
-            .audio
-            .get_static_pad("src")
-            .expect("Failed to get src pad from audio");
-
-        //        self.audio_out
-        //            .release_request_pad(&src_pad.get_peer().unwrap());
-
-        // Detach video
-        let src_pad = output
-            .video
-            .get_static_pad("src")
-            .expect("Failed to get src pad from video");
-
-        //        self.video_out
-        //           .release_request_pad(&src_pad.get_peer().unwrap());
-
-        // Ask the Output for its audio/video (which represent the interaudiosrc/intervideosrc)
-        // Ask for the src pad
-        // As the src pad for its peer
-        // unlink
-        // After doing this for both audio and video. Then we can remove the output.pipeline from
-        // our mixer pipeline
-
+        let output = self.outputs.get_mut(name).unwrap();
+        output.unlink()?;
         self.outputs.remove(name);
 
         Ok(())
@@ -309,21 +267,6 @@ impl Mixer {
         }
 
         self.pipeline.set_state(gst::State::Null)?;
-        Ok(())
-    }
-
-    fn remove_output_elements(&self, elem: &gst::Element) -> Result<(), Box<dyn Error>> {
-        elem.foreach_src_pad(|e, p| {
-            if let Some(peer) = p.get_peer() {
-                self.remove_output_elements(&peer.get_parent_element().unwrap())
-                    .expect("expected elements to be removed");
-            }
-            true
-        });
-
-        self.pipeline
-            .remove(elem)
-            .expect("Expected element to be removed from pipeline.");
         Ok(())
     }
 }
