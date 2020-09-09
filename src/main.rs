@@ -36,7 +36,9 @@ fn main() {
         .add_output(RTMP::new("backup", rtmp_uri2).expect("Failed to build Output"))
         .expect("Failed to add output");
 
-    mixer.remove_output("backup");
+    mixer
+        .remove_output("backup")
+        .expect("Failed to remove output");
 
     mixer.play().expect("Error setting pipeline state to play");
 }

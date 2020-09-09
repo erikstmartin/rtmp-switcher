@@ -117,10 +117,17 @@ impl Output for Auto {
     }
 
     fn unlink(&self) -> Result<(), Error> {
-        self.pipeline
-            .as_ref()
-            .unwrap()
-            .remove_many(&[&self.audiosink, &self.videosink])?;
+        self.pipeline.as_ref().unwrap().remove_many(&[
+            &self.audioqueue,
+            &self.audiosink,
+            &self.videoqueue,
+            &self.video_convert,
+            &self.video_scale,
+            &self.video_rate,
+            &self.video_capsfilter,
+            &self.videosink_queue,
+            &self.videosink,
+        ])?;
 
         Ok(())
     }
@@ -292,24 +299,25 @@ impl Output for RTMP {
     fn unlink(&self) -> Result<(), Error> {
         let pipeline = self.pipeline.as_ref().unwrap();
         pipeline.remove_many(&[
+            &self.video_queue,
             &self.video_convert,
             &self.video_scale,
             &self.video_rate,
             &self.video_capsfilter,
             &self.x264enc,
             &self.h264parse,
-            &self.video_queue,
+            &self.flvqueue,
             &self.flvmux,
             &self.queue_sink,
             &self.video_sink,
         ])?;
 
         pipeline.remove_many(&[
+            &self.audio_queue,
             &self.audio_convert,
             &self.audio_resample,
             &self.audioenc,
             &self.aacparse,
-            &self.audio_queue,
         ])?;
 
         Ok(())
