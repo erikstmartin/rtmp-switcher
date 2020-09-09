@@ -26,22 +26,17 @@ fn main() {
     mixer
         .add_output(Auto::new("auto").expect("Failed to build Output"))
         .expect("Failed to add output");
-    mixer
-        .add_output(Auto::new("auto2").expect("Failed to build Output"))
-        .expect("Failed to add output");
-    mixer
-        .remove_output("auto2")
-        .expect("Failed to remove Output");
     /*
+     */
     mixer
         .add_output(RTMP::new("rtmp", rtmp_uri).expect("Failed to build Output"))
         .expect("Failed to add output");
+
     mixer
         .add_output(RTMP::new("backup", rtmp_uri2).expect("Failed to build Output"))
         .expect("Failed to add output");
-    */
 
-    //mixer.remove_output("rtmp");
+    mixer.remove_output("backup");
 
     mixer.play().expect("Error setting pipeline state to play");
 }

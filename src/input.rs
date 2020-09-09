@@ -35,7 +35,7 @@ impl URI {
             Some(format!("{}_videoconvert", name).as_str()),
         )?;
         let videoqueue =
-            gst::ElementFactory::make("queue", Some(format!("{}_videoqueue", name).as_str()))?;
+            gst::ElementFactory::make("queue2", Some(format!("{}_videoqueue", name).as_str()))?;
 
         let audioconvert = gst::ElementFactory::make(
             "audioconvert",
@@ -46,7 +46,7 @@ impl URI {
             Some(format!("{}_audioresample", name).as_str()),
         )?;
         let audioqueue =
-            gst::ElementFactory::make("queue", Some(format!("{}_audioqueue", name).as_str()))?;
+            gst::ElementFactory::make("queue2", Some(format!("{}_audioqueue", name).as_str()))?;
 
         let audio = audioconvert.clone();
         let video = videoconvert.clone();

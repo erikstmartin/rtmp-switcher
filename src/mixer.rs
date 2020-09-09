@@ -8,6 +8,7 @@ use std::error::Error;
 use std::fmt;
 
 // TODO:
+// - Fix our remove_output methods, they are missing our new elements
 // - Inputs and Outputs may be audio only or video only.
 // - autoaudiosink does not play audio, even though it's in a playing state,
 // when used with RTMP sink
@@ -19,11 +20,13 @@ use std::fmt;
 // - Figure out why some input videos work and others fail (mismatch between sample rate of audio)
 // - Better comments
 // - Tests (eeeeek!)
+//
+// - Network resilience (need to reset from paused to play)
+// https://gstreamer.freedesktop.org/documentation/tutorials/basic/streaming.html?gi-language=c
 
-// TODO: Current issue - We have weird artifacts/discontinuity only on RTMP sinks.
-// - This does not happen when our input is in the main pipeline. It only happens when the input is
-// in its own bin.
-// - The video that comes of the autovideosink is perfect..., even when input is in its own bin.
+// TODO: Current issue - We have weird artifacts/discontinuity only on RTMP sinks or stall.
+// - This happens when we don't have a videorate element in our RTMP pipeline
+// - If we have the videorate element and we are also sending to autovideosink, we stall
 
 #[derive(Debug)]
 pub struct MixerError {
@@ -71,7 +74,7 @@ impl Mixer {
         let video_mixer = gst::ElementFactory::make("compositor", Some("videomixer"))?;
         let video_caps = gst::Caps::builder("video/x-raw")
             // TODO:.field("format", &gst_video::VideoFormat::Rgba.to_str())
-            .field("framerate", &gst::Fraction::new(60, 1))
+            .field("framerate", &gst::Fraction::new(30, 1))
             .build();
         video_capsfilter.set_property("caps", &video_caps).unwrap();
 
@@ -91,6 +94,7 @@ impl Mixer {
             .build();
         audio_capsfilter.set_property("caps", &audio_caps).unwrap();
 
+        let audio_queue = gst::ElementFactory::make("queue", Some("audiomixer_queue"))?;
         let audio_tee = gst::ElementFactory::make("tee", Some("audiotee"))?;
         audio_tee.set_property("allow-not-linked", &true)?;
 
