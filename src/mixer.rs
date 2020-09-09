@@ -75,7 +75,7 @@ impl Mixer {
             .build();
         video_capsfilter.set_property("caps", &video_caps).unwrap();
 
-        let video_queue = gst::ElementFactory::make("queue", Some("videotestsrc_queue"))?;
+        let video_queue = gst::ElementFactory::make("queue", Some("videomixer_queue"))?;
         let video_tee = gst::ElementFactory::make("tee", Some("videotee"))?;
         video_tee.set_property("allow-not-linked", &true)?;
 
@@ -256,7 +256,7 @@ impl Mixer {
                         );
 
                         self.pipeline.debug_to_dot_file(
-                            gst::DebugGraphDetails::all(),
+                            gst::DebugGraphDetails::VERBOSE,
                             format!("{:?}", state_changed.get_current()),
                         );
                     }
