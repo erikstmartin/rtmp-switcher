@@ -49,12 +49,12 @@ impl Error for MixerError {
 }
 
 pub struct Mixer {
-    name: String,
+    pub name: String,
     pipeline: gst::Pipeline,
     audio_mixer: gst::Element,
     video_mixer: gst::Element,
-    inputs: HashMap<String, Box<dyn Input>>,
-    outputs: HashMap<String, Box<dyn Output>>,
+    inputs: HashMap<String, Input>,
+    outputs: HashMap<String, Output>,
     audio_out: gst::Element,
     video_out: gst::Element,
 }
@@ -147,10 +147,7 @@ impl Mixer {
         })
     }
 
-    pub fn add_input(
-        &mut self,
-        mut input: Box<dyn Input>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn add_input(&mut self, mut input: Input) -> Result<(), Box<dyn std::error::Error>> {
         if self.inputs.contains_key(&input.name()) {
             return Err(MixerError::new(
                 format!("Input with name '{}' already exists.", input.name()).as_str(),
@@ -187,10 +184,7 @@ impl Mixer {
         Ok(())
     }
 
-    pub fn add_output(
-        &mut self,
-        mut output: Box<dyn Output>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn add_output(&mut self, mut output: Output) -> Result<(), Box<dyn std::error::Error>> {
         if self.outputs.contains_key(&output.name()) {
             return Err(MixerError::new(
                 format!("Output with name '{}' already exists.", output.name()).as_str(),

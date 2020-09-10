@@ -3,15 +3,37 @@ use gst::prelude::*;
 
 type Error = Box<dyn std::error::Error>;
 
-pub trait Input {
-    fn name(&self) -> String;
-    fn link(
+pub enum Input {
+    URI(URI),
+}
+
+impl Input {
+    pub fn from_uri(name: &str, uri: &str) -> Input {
+        URI::new(name, uri).unwrap()
+    }
+
+    pub fn name(&mut self) -> String {
+        match self {
+            Input::URI(input) => input.name(),
+        }
+    }
+
+    pub fn link(
         &mut self,
         pipeline: gst::Pipeline,
         audio: gst::Element,
         video: gst::Element,
-    ) -> Result<(), Error>;
-    fn unlink(&self) -> Result<(), Error>;
+    ) -> Result<(), Error> {
+        match self {
+            Input::URI(input) => input.link(pipeline, audio, video),
+        }
+    }
+
+    pub fn unlink(&self) -> Result<(), Error> {
+        match self {
+            Input::URI(input) => input.unlink(),
+        }
+    }
 }
 
 pub struct URI {
@@ -25,7 +47,7 @@ pub struct URI {
 }
 
 impl URI {
-    pub fn new(name: &str, uri: &str) -> Result<Box<dyn Input>, Box<dyn std::error::Error>> {
+    pub fn new(name: &str, uri: &str) -> Result<Input, Box<dyn std::error::Error>> {
         let source =
             gst::ElementFactory::make("uridecodebin", Some(format!("{}_source", name).as_str()))?;
         source.set_property("uri", &uri)?;
@@ -98,7 +120,7 @@ impl URI {
             }
         });
 
-        Ok(Box::new(Self {
+        Ok(Input::URI(Self {
             name: name.to_string(),
             source,
             audioconvert,
@@ -108,9 +130,7 @@ impl URI {
             videoqueue,
         }))
     }
-}
 
-impl Input for URI {
     fn name(&self) -> String {
         self.name.clone()
     }

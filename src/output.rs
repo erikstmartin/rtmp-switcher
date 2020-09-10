@@ -3,15 +3,37 @@ use gst::prelude::*;
 
 type Error = Box<dyn std::error::Error>;
 
-pub trait Output {
-    fn name(&self) -> String;
-    fn link(
+pub enum Output {
+    RTMP(RTMP),
+    Auto(Auto),
+}
+
+impl Output {
+    pub fn name(&mut self) -> String {
+        match self {
+            Output::RTMP(output) => output.name(),
+            Output::Auto(output) => output.name(),
+        }
+    }
+
+    pub fn link(
         &mut self,
         pipeline: gst::Pipeline,
         audio: gst::Element,
         video: gst::Element,
-    ) -> Result<(), Error>;
-    fn unlink(&self) -> Result<(), Error>;
+    ) -> Result<(), Error> {
+        match self {
+            Output::RTMP(output) => output.link(pipeline, audio, video),
+            Output::Auto(output) => output.link(pipeline, audio, video),
+        }
+    }
+
+    pub fn unlink(&self) -> Result<(), Error> {
+        match self {
+            Output::RTMP(output) => output.unlink(),
+            Output::Auto(output) => output.unlink(),
+        }
+    }
 }
 
 pub struct Auto {
@@ -29,7 +51,7 @@ pub struct Auto {
 }
 
 impl Auto {
-    pub fn new(name: &str) -> Result<Box<dyn Output>, Box<dyn std::error::Error>> {
+    pub fn new(name: &str) -> Result<Output, Box<dyn std::error::Error>> {
         let videoqueue =
             gst::ElementFactory::make("queue", Some(format!("{}_video_queue", name).as_str()))?;
         let video_convert = gst::ElementFactory::make(
@@ -62,7 +84,7 @@ impl Auto {
             Some(format!("{}_audio_sink", name).as_str()),
         )?;
 
-        Ok(Box::new(Self {
+        Ok(Output::Auto(Self {
             name: name.to_string(),
             pipeline: None,
             audioqueue,
@@ -76,9 +98,7 @@ impl Auto {
             videosink,
         }))
     }
-}
 
-impl Output for Auto {
     fn name(&self) -> String {
         self.name.clone()
     }
@@ -156,7 +176,7 @@ pub struct RTMP {
 }
 
 impl RTMP {
-    pub fn new(name: &str, uri: &str) -> Result<Box<dyn Output>, Box<dyn std::error::Error>> {
+    pub fn new(name: &str, uri: &str) -> Result<Output, Box<dyn std::error::Error>> {
         // Video stream
         let video_queue =
             gst::ElementFactory::make("queue", Some(format!("{}_video_queue", name).as_str()))?;
@@ -209,7 +229,7 @@ impl RTMP {
         let aacparse =
             gst::ElementFactory::make("aacparse", Some(format!("{}_aacparse", name).as_str()))?;
 
-        Ok(Box::new(Self {
+        Ok(Output::RTMP(Self {
             name: name.to_string(),
             pipeline: None,
             video_queue,
@@ -230,9 +250,7 @@ impl RTMP {
             aacparse,
         }))
     }
-}
 
-impl Output for RTMP {
     fn name(&self) -> String {
         self.name.clone()
     }
