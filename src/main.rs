@@ -1,12 +1,14 @@
+mod http;
 mod input;
 mod mixer;
 mod output;
 
-use gstreamer as gst;
-use input::*;
-use mixer::*;
-use output::*;
+use http::Server;
+extern crate gstreamer as gst;
 
+// TODO: Bring in Clap for command line arguments
+
+/*
 fn main() {
     // Initialize GStreamer
     gst::init().unwrap();
@@ -41,4 +43,18 @@ fn main() {
         .expect("Failed to remove output");
 
     mixer.play().expect("Error setting pipeline state to play");
+}
+*/
+
+#[tokio::main]
+async fn main() {
+    gst::init().unwrap();
+
+    let server = Server::new();
+    server
+        .mixer_create("erikdotdev")
+        .expect("failed to create new mixer");
+
+    // let fut = warp::run(); tokio::select! { fut => {}, timeout => {}, signal => {} }
+    server.run().await;
 }
