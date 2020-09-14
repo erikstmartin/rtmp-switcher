@@ -5,12 +5,10 @@ authors = ["Erik St. Martin <alakriti@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-#gstreamer = { git = "https://github.com/sdroege/gstreamer-rs.git", branch = "master", features = ["v1_14"] }
-gstreamer = { version = "0.16.2", features = ["v1_14"]}
-gstreamer-video = "0.16.0"
+gstreamer = { version = "0.16.3", features = ["v1_14"]}
+gstreamer-video = "0.16.3"
 tokio = { version = "0.2", features = ["full"] }
 warp = "0.2"
 serde = "1.0"
 serde_json = "1.0"
-# TODO: examples show this in dev-dependencies, build fails if it's not here though?
 serde_derive = "1.0"
