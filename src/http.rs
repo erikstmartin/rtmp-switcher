@@ -3,6 +3,7 @@ extern crate serde_derive;
 
 use crate::mixer;
 use serde_derive::{Deserialize, Serialize};
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
@@ -40,12 +41,13 @@ impl Server {
     }
 
     pub fn mixer_create(&self, name: &str) -> Result<(), Error> {
-        let mut mixer = mixer::Mixer::new(name)?;
+        let mixer = mixer::Mixer::new(name)?;
         let mut mixers = self.mixers.lock().unwrap();
 
-        if mixers.insert(name.to_string(), mixer).is_some() {
-            return Err(Error::Exists);
-        }
+        match mixers.entry(name.to_string()) {
+            Entry::Occupied(_) => return Err(Error::Exists),
+            Entry::Vacant(entry) => entry.insert(mixer),
+        };
 
         Ok(())
     }
