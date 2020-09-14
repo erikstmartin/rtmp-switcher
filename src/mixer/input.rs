@@ -1,7 +1,5 @@
-extern crate gstreamer as gst;
+use crate::Result;
 use gst::prelude::*;
-
-type Error = Box<dyn std::error::Error>;
 
 pub enum Input {
     URI(URI),
@@ -23,13 +21,13 @@ impl Input {
         pipeline: gst::Pipeline,
         audio: gst::Element,
         video: gst::Element,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         match self {
             Input::URI(input) => input.link(pipeline, audio, video),
         }
     }
 
-    pub fn unlink(&self) -> Result<(), Error> {
+    pub fn unlink(&self) -> Result<()> {
         match self {
             Input::URI(input) => input.unlink(),
         }
@@ -47,7 +45,7 @@ pub struct URI {
 }
 
 impl URI {
-    pub fn new(name: &str, uri: &str) -> Result<Input, Box<dyn std::error::Error>> {
+    pub fn new(name: &str, uri: &str) -> Result<Input> {
         let source =
             gst::ElementFactory::make("uridecodebin", Some(format!("{}_source", name).as_str()))?;
         source.set_property("uri", &uri)?;
@@ -140,7 +138,7 @@ impl URI {
         pipeline: gst::Pipeline,
         audio: gst::Element,
         video: gst::Element,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<()> {
         pipeline.add_many(&[
             &self.source,
             &self.audioconvert,
@@ -161,7 +159,7 @@ impl URI {
         return Ok(());
     }
 
-    fn unlink(&self) -> Result<(), Error> {
+    fn unlink(&self) -> Result<()> {
         unimplemented!()
     }
 }

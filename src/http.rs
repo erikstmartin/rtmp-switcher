@@ -5,12 +5,25 @@ use crate::mixer;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use thiserror::Error;
 
-type Error = Box<dyn std::error::Error + 'static>;
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("unknown error")]
+    Unknown,
+
+    #[error("already exists")]
+    Exists,
+
+    #[error("An error was returned from the mixer: '{0}'")]
+    Mixer(#[from] mixer::Error),
+}
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Mixer {
     pub name: String,
+    pub input_count: usize,
+    pub output_count: usize,
 }
 
 #[derive(Clone)]
@@ -27,9 +40,12 @@ impl Server {
     }
 
     pub fn mixer_create(&self, name: &str) -> Result<(), Error> {
+        let mut mixer = mixer::Mixer::new(name)?;
         let mut mixers = self.mixers.lock().unwrap();
-        let mixer = mixer::Mixer::new(&name)?;
-        mixers.insert(name.to_string(), mixer);
+
+        if mixers.insert(name.to_string(), mixer).is_some() {
+            return Err(Error::Exists);
+        }
 
         Ok(())
     }
@@ -42,7 +58,34 @@ impl Server {
 
 mod handlers {
     use std::convert::Infallible;
+    use warp::http::StatusCode;
     use warp::*;
+
+    pub async fn mixer_create(
+        mixer: super::Mixer,
+        server: super::Server,
+    ) -> Result<impl warp::Reply, Infallible> {
+        match server.mixer_create(&mixer.name) {
+            Ok(_) => Ok(StatusCode::CREATED),
+            Err(_) => Ok(StatusCode::INTERNAL_SERVER_ERROR),
+        }
+    }
+
+    pub async fn mixer_get(
+        name: String,
+        server: super::Server,
+    ) -> Result<impl warp::Reply, Infallible> {
+        let m = server.mixers.lock().unwrap();
+        let mixer = m.get(name.as_str()).unwrap();
+
+        let mixer = &super::Mixer {
+            name: mixer.name.clone(),
+            input_count: mixer.input_count(),
+            output_count: mixer.output_count(),
+        };
+
+        Ok(warp::reply::json(mixer))
+    }
 
     pub async fn mixer_list(server: super::Server) -> Result<impl warp::Reply, Infallible> {
         let mixers: Vec<super::Mixer> = server
@@ -52,6 +95,8 @@ mod handlers {
             .iter()
             .map(|(id, m)| super::Mixer {
                 name: m.name.clone(),
+                input_count: m.input_count(),
+                output_count: m.output_count(),
             })
             .collect();
         Ok(warp::reply::json(&mixers))
@@ -68,10 +113,28 @@ mod filters {
         warp::any().map(move || server.clone())
     }
 
+    fn json_body() -> impl Filter<Extract = (super::Mixer,), Error = warp::Rejection> + Clone {
+        // When accepting a body, we want a JSON body
+        // (and to reject huge payloads)...
+        warp::body::content_length_limit(1024 * 16).and(warp::body::json())
+    }
+
     pub fn routes(
         server: super::Server,
     ) -> impl Filter<Extract = impl Reply, Error = warp::Rejection> + Clone {
-        mixer_list(server.clone()).or(mixer_get(server.clone()))
+        mixer_list(server.clone())
+            .or(mixer_get(server.clone()))
+            .or(mixer_create(server.clone()))
+    }
+
+    fn mixer_create(
+        server: super::Server,
+    ) -> impl Filter<Extract = impl Reply, Error = warp::Rejection> + Clone {
+        warp::path!("mixers")
+            .and(warp::post())
+            .and(json_body())
+            .and(with_server(server))
+            .and_then(handlers::mixer_create)
     }
 
     fn mixer_list(
@@ -88,6 +151,7 @@ mod filters {
     ) -> impl Filter<Extract = impl Reply, Error = warp::Rejection> + Clone {
         warp::path!("mixers" / String)
             .and(warp::get())
-            .map(|name| format!("Mixer {}", name))
+            .and(with_server(server))
+            .and_then(handlers::mixer_get)
     }
 }

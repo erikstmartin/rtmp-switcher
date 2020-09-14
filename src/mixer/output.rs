@@ -1,7 +1,5 @@
-extern crate gstreamer as gst;
+use crate::Result;
 use gst::prelude::*;
-
-type Error = Box<dyn std::error::Error>;
 
 pub enum Output {
     RTMP(RTMP),
@@ -21,14 +19,14 @@ impl Output {
         pipeline: gst::Pipeline,
         audio: gst::Element,
         video: gst::Element,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         match self {
             Output::RTMP(output) => output.link(pipeline, audio, video),
             Output::Auto(output) => output.link(pipeline, audio, video),
         }
     }
 
-    pub fn unlink(&self) -> Result<(), Error> {
+    pub fn unlink(&self) -> Result<()> {
         match self {
             Output::RTMP(output) => output.unlink(),
             Output::Auto(output) => output.unlink(),
@@ -51,7 +49,7 @@ pub struct Auto {
 }
 
 impl Auto {
-    pub fn new(name: &str) -> Result<Output, Box<dyn std::error::Error>> {
+    pub fn new(name: &str) -> Result<Output> {
         let videoqueue =
             gst::ElementFactory::make("queue", Some(format!("{}_video_queue", name).as_str()))?;
         let video_convert = gst::ElementFactory::make(
@@ -107,7 +105,7 @@ impl Auto {
         pipeline: gst::Pipeline,
         audio: gst::Element,
         video: gst::Element,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         pipeline.add_many(&[
             &self.audioqueue,
             &self.audiosink,
@@ -136,7 +134,7 @@ impl Auto {
         Ok(())
     }
 
-    fn unlink(&self) -> Result<(), Error> {
+    fn unlink(&self) -> Result<()> {
         self.pipeline.as_ref().unwrap().remove_many(&[
             &self.audioqueue,
             &self.audiosink,
@@ -176,7 +174,7 @@ pub struct RTMP {
 }
 
 impl RTMP {
-    pub fn new(name: &str, uri: &str) -> Result<Output, Box<dyn std::error::Error>> {
+    pub fn new(name: &str, uri: &str) -> Result<Output> {
         // Video stream
         let video_queue =
             gst::ElementFactory::make("queue", Some(format!("{}_video_queue", name).as_str()))?;
@@ -259,7 +257,7 @@ impl RTMP {
         pipeline: gst::Pipeline,
         audio: gst::Element,
         video: gst::Element,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         // Video
         pipeline.add_many(&[
             &self.video_queue,
@@ -314,7 +312,7 @@ impl RTMP {
         Ok(())
     }
 
-    fn unlink(&self) -> Result<(), Error> {
+    fn unlink(&self) -> Result<()> {
         let pipeline = self.pipeline.as_ref().unwrap();
         pipeline.remove_many(&[
             &self.video_queue,

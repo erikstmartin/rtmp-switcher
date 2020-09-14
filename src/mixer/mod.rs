@@ -1,11 +1,13 @@
-extern crate gstreamer as gst;
-extern crate gstreamer_video as gst_video;
-use super::input::Input;
-use super::output::Output;
+mod error;
+pub mod input;
+pub mod output;
+
+use crate::Result;
+pub use error::Error;
 use gst::prelude::*;
+use input::Input;
+use output::Output;
 use std::collections::HashMap;
-use std::error::Error;
-use std::fmt;
 
 // TODO:
 // - Inputs and Outputs may be audio only or video only.
@@ -23,31 +25,6 @@ use std::fmt;
 // - Network resilience (need to reset from paused to play)
 // https://gstreamer.freedesktop.org/documentation/tutorials/basic/streaming.html?gi-language=c
 
-#[derive(Debug)]
-pub struct MixerError {
-    details: String,
-}
-
-impl MixerError {
-    fn new(msg: impl Into<String>) -> MixerError {
-        MixerError {
-            details: msg.into(),
-        }
-    }
-}
-
-impl fmt::Display for MixerError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.details)
-    }
-}
-
-impl Error for MixerError {
-    fn description(&self) -> &str {
-        &self.details
-    }
-}
-
 pub struct Mixer {
     pub name: String,
     pipeline: gst::Pipeline,
@@ -60,7 +37,7 @@ pub struct Mixer {
 }
 
 impl Mixer {
-    pub fn new(name: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(name: &str) -> Result<Self> {
         let background_enabled = true;
         let pipeline = gst::Pipeline::new(Some(name));
 
@@ -147,12 +124,13 @@ impl Mixer {
         })
     }
 
-    pub fn add_input(&mut self, mut input: Input) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn input_count(&self) -> usize {
+        self.inputs.len()
+    }
+
+    pub fn add_input(&mut self, mut input: Input) -> Result<()> {
         if self.inputs.contains_key(&input.name()) {
-            return Err(MixerError::new(
-                format!("Input with name '{}' already exists.", input.name()).as_str(),
-            )
-            .into());
+            return Err(Error::Exists("input".to_string(), input.name()));
         }
 
         input.link(
@@ -169,12 +147,9 @@ impl Mixer {
     // traverse pads->peers until we hit audio or video mixer.
     // Don't remove mixer element
     // release pad from mixer
-    pub fn remove_input(&mut self, name: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn remove_input(&mut self, name: &str) -> Result<()> {
         if !self.inputs.contains_key(name) {
-            return Err(MixerError::new(
-                format!("Input with name '{}' doesn't exist.", name).as_str(),
-            )
-            .into());
+            return Err(Error::NotFound("input".to_string(), name.to_string()));
         }
 
         let input = self.inputs.get_mut(name).unwrap();
@@ -184,12 +159,13 @@ impl Mixer {
         Ok(())
     }
 
-    pub fn add_output(&mut self, mut output: Output) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn output_count(&self) -> usize {
+        self.outputs.len()
+    }
+
+    pub fn add_output(&mut self, mut output: Output) -> Result<()> {
         if self.outputs.contains_key(&output.name()) {
-            return Err(MixerError::new(
-                format!("Output with name '{}' already exists.", output.name()).as_str(),
-            )
-            .into());
+            return Err(Error::Exists("output".to_string(), output.name()));
         }
 
         output.link(
@@ -203,12 +179,9 @@ impl Mixer {
         Ok(())
     }
 
-    pub fn remove_output(&mut self, name: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn remove_output(&mut self, name: &str) -> Result<()> {
         if !self.outputs.contains_key(name) {
-            return Err(MixerError::new(
-                format!("Output with name '{}' doesn't exist.", name).as_str(),
-            )
-            .into());
+            return Err(Error::NotFound("output".to_string(), name.to_string()));
         }
 
         let output = self.outputs.get_mut(name).unwrap();
@@ -218,7 +191,7 @@ impl Mixer {
         Ok(())
     }
 
-    pub fn play(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn play(&self) -> Result<()> {
         self.pipeline.set_state(gst::State::Playing)?;
 
         // Wait until error or EOS
