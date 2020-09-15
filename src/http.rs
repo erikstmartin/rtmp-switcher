@@ -1,8 +1,5 @@
-extern crate serde;
-extern crate serde_derive;
-
 use crate::mixer;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
