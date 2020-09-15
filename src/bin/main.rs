@@ -1,5 +1,10 @@
-use switcher::http::Server;
-extern crate gstreamer as gst;
+mod http;
+mod input;
+mod mixer;
+mod output;
+
+use gstreamer as gst;
+use http::Server;
 
 // TODO: Bring in Clap for command line arguments
 

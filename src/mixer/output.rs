@@ -1,5 +1,6 @@
 use crate::Result;
 use gst::prelude::*;
+use gstreamer as gst;
 
 pub enum Output {
     RTMP(RTMP),
