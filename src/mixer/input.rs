@@ -11,9 +11,21 @@ impl Input {
         URI::new(name, uri).unwrap()
     }
 
-    pub fn name(&mut self) -> String {
+    pub fn name(&self) -> String {
         match self {
             Input::URI(input) => input.name(),
+        }
+    }
+
+    pub fn location(&self) -> String {
+        match self {
+            Input::URI(input) => input.location.clone(),
+        }
+    }
+
+    pub fn input_type(&self) -> String {
+        match self {
+            Input::URI(_) => "URI".to_string(),
         }
     }
 
@@ -37,6 +49,7 @@ impl Input {
 
 pub struct URI {
     pub name: String,
+    pub location: String,
     source: gst::Element,
     audioconvert: gst::Element,
     audioresample: gst::Element,
@@ -121,6 +134,7 @@ impl URI {
 
         Ok(Input::URI(Self {
             name: name.to_string(),
+            location: name.to_string(),
             source,
             audioconvert,
             audioresample,

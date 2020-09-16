@@ -1,4 +1,5 @@
 use crate::mixer;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
@@ -13,6 +14,12 @@ pub enum Error {
     #[error("already exists")]
     Exists,
 
+    #[error("not found")]
+    NotFound,
+
+    #[error("name is invalid")]
+    InvalidName,
+
     #[error("An error was returned from the mixer: '{0}'")]
     Mixer(#[from] mixer::Error),
 }
@@ -22,6 +29,20 @@ pub struct Mixer {
     pub name: String,
     pub input_count: usize,
     pub output_count: usize,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct Input {
+    pub name: String,
+    pub input_type: String,
+    pub location: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct Output {
+    pub name: String,
+    pub output_type: String,
+    pub location: String,
 }
 
 #[derive(Clone)]
@@ -38,6 +59,10 @@ impl Server {
     }
 
     pub fn mixer_create(&self, name: &str) -> Result<(), Error> {
+        let re = Regex::new(r"^[a-zA-Z0-9-]+$").unwrap();
+        if !re.is_match(name) {
+            return Err(Error::InvalidName);
+        }
         let mixer = mixer::Mixer::new(name)?;
         let mut mixers = self.mixers.lock().unwrap();
 
@@ -49,6 +74,23 @@ impl Server {
         Ok(())
     }
 
+    pub fn input_add(&self, mixer: &str, input: mixer::Input) -> Result<(), Error> {
+        match self.mixers.lock().unwrap().get_mut(mixer) {
+            Some(m) => m.input_add(input).map_err(|e| Error::Mixer(e)),
+            None => Err(Error::NotFound),
+        }
+    }
+
+    pub fn output_add(&self, mixer: &str, output: mixer::Output) -> Result<(), Error> {
+        match self.mixers.lock().unwrap().get_mut(mixer) {
+            Some(m) => match m.output_add(output) {
+                Ok(_) => Ok(()),
+                Err(e) => Err(Error::Mixer(e)),
+            },
+            None => Err(Error::NotFound),
+        }
+    }
+
     pub async fn run(&self) {
         let addr: std::net::SocketAddr = "127.0.0.1:3030".parse().unwrap();
         warp::serve(filters::routes(self.clone())).run(addr).await;
@@ -58,7 +100,6 @@ impl Server {
 mod handlers {
     use std::convert::Infallible;
     use warp::http::StatusCode;
-    use warp::*;
 
     pub async fn mixer_create(
         mixer: super::Mixer,
@@ -92,13 +133,55 @@ mod handlers {
             .lock()
             .unwrap()
             .iter()
-            .map(|(id, m)| super::Mixer {
+            .map(|(_, m)| super::Mixer {
                 name: m.name.clone(),
                 input_count: m.input_count(),
                 output_count: m.output_count(),
             })
             .collect();
         Ok(warp::reply::json(&mixers))
+    }
+
+    pub async fn input_list(
+        name: String,
+        server: super::Server,
+    ) -> Result<impl warp::Reply, Infallible> {
+        let inputs: Vec<super::Input> = server
+            .mixers
+            .lock()
+            .unwrap()
+            .get(&name)
+            .unwrap()
+            .inputs
+            .iter()
+            .map(|(_, input)| super::Input {
+                name: input.name(),
+                input_type: input.input_type(),
+                location: input.location(),
+            })
+            .collect();
+        Ok(warp::reply::json(&inputs))
+    }
+
+    pub async fn output_list(
+        name: String,
+        server: super::Server,
+    ) -> Result<impl warp::Reply, Infallible> {
+        let outputs: Vec<super::Output> = server
+            .mixers
+            .lock()
+            .unwrap()
+            .get(&name)
+            .unwrap()
+            .outputs
+            .iter()
+            .map(|(_, output)| super::Output {
+                name: output.name(),
+                output_type: output.output_type(),
+                location: output.location(),
+            })
+            .collect();
+        Ok(warp::reply::json(&outputs))
     }
 }
 
@@ -124,6 +207,8 @@ mod filters {
         mixer_list(server.clone())
             .or(mixer_get(server.clone()))
             .or(mixer_create(server.clone()))
+            .or(input_list(server.clone()))
+            .or(output_list(server.clone()))
     }
 
     fn mixer_create(
@@ -152,5 +237,23 @@ mod filters {
             .and(warp::get())
             .and(with_server(server))
             .and_then(handlers::mixer_get)
+    }
+
+    fn input_list(
+        server: super::Server,
+    ) -> impl Filter<Extract = impl Reply, Error = warp::Rejection> + Clone {
+        warp::path!("mixers" / String / "inputs")
+            .and(warp::get())
+            .and(with_server(server))
+            .and_then(handlers::input_list)
+    }
+
+    fn output_list(
+        server: super::Server,
+    ) -> impl Filter<Extract = impl Reply, Error = warp::Rejection> + Clone {
+        warp::path!("mixers" / String / "outputs")
+            .and(warp::get())
+            .and(with_server(server))
+            .and_then(handlers::output_list)
     }
 }

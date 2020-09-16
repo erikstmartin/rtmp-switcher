@@ -8,10 +8,24 @@ pub enum Output {
 }
 
 impl Output {
-    pub fn name(&mut self) -> String {
+    pub fn name(&self) -> String {
         match self {
             Output::RTMP(output) => output.name(),
             Output::Auto(output) => output.name(),
+        }
+    }
+
+    pub fn output_type(&self) -> String {
+        match self {
+            Output::RTMP(_) => "RTMP".to_string(),
+            Output::Auto(_) => "Auto".to_string(),
+        }
+    }
+
+    pub fn location(&self) -> String {
+        match self {
+            Output::RTMP(output) => output.location.clone(),
+            Output::Auto(_) => "".to_string(),
         }
     }
 
@@ -154,6 +168,7 @@ impl Auto {
 
 pub struct RTMP {
     pub name: String,
+    pub location: String,
     pipeline: Option<gst::Pipeline>,
     video_queue: gst::Element,
     video_convert: gst::Element,
@@ -230,6 +245,7 @@ impl RTMP {
 
         Ok(Output::RTMP(Self {
             name: name.to_string(),
+            location: uri.to_string(),
             pipeline: None,
             video_queue,
             video_convert,

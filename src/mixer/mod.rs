@@ -5,8 +5,8 @@ pub mod output;
 use crate::Result;
 pub use error::Error;
 use gst::prelude::*;
-use input::Input;
-use output::Output;
+pub use input::Input;
+pub use output::Output;
 use std::collections::HashMap;
 
 // TODO:
@@ -30,8 +30,8 @@ pub struct Mixer {
     pipeline: gst::Pipeline,
     audio_mixer: gst::Element,
     video_mixer: gst::Element,
-    inputs: HashMap<String, Input>,
-    outputs: HashMap<String, Output>,
+    pub inputs: HashMap<String, Input>,
+    pub outputs: HashMap<String, Output>,
     audio_out: gst::Element,
     video_out: gst::Element,
 }
@@ -128,7 +128,7 @@ impl Mixer {
         self.inputs.len()
     }
 
-    pub fn add_input(&mut self, mut input: Input) -> Result<()> {
+    pub fn input_add(&mut self, mut input: Input) -> Result<()> {
         if self.inputs.contains_key(&input.name()) {
             return Err(Error::Exists("input".to_string(), input.name()));
         }
@@ -147,7 +147,7 @@ impl Mixer {
     // traverse pads->peers until we hit audio or video mixer.
     // Don't remove mixer element
     // release pad from mixer
-    pub fn remove_input(&mut self, name: &str) -> Result<()> {
+    pub fn input_remove(&mut self, name: &str) -> Result<()> {
         if !self.inputs.contains_key(name) {
             return Err(Error::NotFound("input".to_string(), name.to_string()));
         }
@@ -163,7 +163,7 @@ impl Mixer {
         self.outputs.len()
     }
 
-    pub fn add_output(&mut self, mut output: Output) -> Result<()> {
+    pub fn output_add(&mut self, mut output: Output) -> Result<()> {
         if self.outputs.contains_key(&output.name()) {
             return Err(Error::Exists("output".to_string(), output.name()));
         }
@@ -179,7 +179,7 @@ impl Mixer {
         Ok(())
     }
 
-    pub fn remove_output(&mut self, name: &str) -> Result<()> {
+    pub fn output_remove(&mut self, name: &str) -> Result<()> {
         if !self.outputs.contains_key(name) {
             return Err(Error::NotFound("output".to_string(), name.to_string()));
         }
