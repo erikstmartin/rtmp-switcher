@@ -1,7 +1,6 @@
 use crate::mixer;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
@@ -47,43 +46,52 @@ pub struct Output {
 
 #[derive(Clone)]
 pub struct Server {
-    pub mixers: Arc<Mutex<HashMap<String, mixer::Mixer>>>,
+    pub mixers: HashMap<String, Arc<Mutex<mixer::Mixer>>>,
 }
 
 impl Server {
     // TODO: Configuration for server
     pub fn new() -> Self {
         Server {
-            mixers: Arc::new(Mutex::new(HashMap::new())),
+            mixers: HashMap::new(),
         }
     }
 
-    pub fn mixer_create(&self, name: &str) -> Result<(), Error> {
+    pub fn mixer_create(&mut self, name: &str) -> Result<(), Error> {
         let re = Regex::new(r"^[a-zA-Z0-9-]+$").unwrap();
         if !re.is_match(name) {
             return Err(Error::InvalidName);
         }
-        let mixer = mixer::Mixer::new(name)?;
-        let mut mixers = self.mixers.lock().unwrap();
+        let m = mixer::Mixer::new(name)?;
+        let mixer = Arc::new(Mutex::new(m));
 
-        match mixers.entry(name.to_string()) {
-            Entry::Occupied(_) => return Err(Error::Exists),
-            Entry::Vacant(entry) => entry.insert(mixer),
-        };
+        if self.mixers.contains_key(name) {
+            return Err(Error::Exists);
+        }
+
+        let m = mixer.clone();
+        // TODO: Store JoinHandle somewhere
+        std::thread::spawn(move || m.lock().unwrap().play());
+
+        self.mixers.insert(name.to_string(), mixer);
 
         Ok(())
     }
 
-    pub fn input_add(&self, mixer: &str, input: mixer::Input) -> Result<(), Error> {
-        match self.mixers.lock().unwrap().get_mut(mixer) {
-            Some(m) => m.input_add(input).map_err(|e| Error::Mixer(e)),
+    pub fn input_add(&mut self, mixer: &str, input: mixer::Input) -> Result<(), Error> {
+        match self.mixers.get_mut(mixer) {
+            Some(m) => m
+                .lock()
+                .unwrap()
+                .input_add(input)
+                .map_err(|e| Error::Mixer(e)),
             None => Err(Error::NotFound),
         }
     }
 
-    pub fn output_add(&self, mixer: &str, output: mixer::Output) -> Result<(), Error> {
-        match self.mixers.lock().unwrap().get_mut(mixer) {
-            Some(m) => match m.output_add(output) {
+    pub fn output_add(&mut self, mixer: &str, output: mixer::Output) -> Result<(), Error> {
+        match self.mixers.get_mut(mixer) {
+            Some(m) => match m.lock().unwrap().output_add(output) {
                 Ok(_) => Ok(()),
                 Err(e) => Err(Error::Mixer(e)),
             },
@@ -93,6 +101,7 @@ impl Server {
 
     pub async fn run(&self) {
         let addr: std::net::SocketAddr = "127.0.0.1:3030".parse().unwrap();
+
         warp::serve(filters::routes(self.clone())).run(addr).await;
     }
 }
@@ -103,7 +112,7 @@ mod handlers {
 
     pub async fn mixer_create(
         mixer: super::Mixer,
-        server: super::Server,
+        mut server: super::Server,
     ) -> Result<impl warp::Reply, Infallible> {
         match server.mixer_create(&mixer.name) {
             Ok(_) => Ok(StatusCode::CREATED),
@@ -115,8 +124,7 @@ mod handlers {
         name: String,
         server: super::Server,
     ) -> Result<impl warp::Reply, Infallible> {
-        let m = server.mixers.lock().unwrap();
-        let mixer = m.get(name.as_str()).unwrap();
+        let mixer = server.mixers.get(name.as_str()).unwrap().lock().unwrap();
 
         let mixer = &super::Mixer {
             name: mixer.name.clone(),
@@ -130,13 +138,15 @@ mod handlers {
     pub async fn mixer_list(server: super::Server) -> Result<impl warp::Reply, Infallible> {
         let mixers: Vec<super::Mixer> = server
             .mixers
-            .lock()
-            .unwrap()
             .iter()
-            .map(|(_, m)| super::Mixer {
-                name: m.name.clone(),
-                input_count: m.input_count(),
-                output_count: m.output_count(),
+            .map(|(_, m)| {
+                let m = m.lock().unwrap();
+
+                super::Mixer {
+                    name: m.name.clone(),
+                    input_count: m.input_count(),
+                    output_count: m.output_count(),
+                }
             })
             .collect();
         Ok(warp::reply::json(&mixers))
@@ -148,9 +158,9 @@ mod handlers {
     ) -> Result<impl warp::Reply, Infallible> {
         let inputs: Vec<super::Input> = server
             .mixers
-            .lock()
-            .unwrap()
             .get(&name)
+            .unwrap()
+            .lock()
             .unwrap()
             .inputs
             .iter()
@@ -169,9 +179,9 @@ mod handlers {
     ) -> Result<impl warp::Reply, Infallible> {
         let outputs: Vec<super::Output> = server
             .mixers
-            .lock()
-            .unwrap()
             .get(&name)
+            .unwrap()
+            .lock()
             .unwrap()
             .outputs
             .iter()
