@@ -69,6 +69,7 @@ impl Server {
             return Err(Error::Exists);
         }
 
+        mixer.lock().unwrap().play();
         self.mixers.insert(name.to_string(), mixer);
 
         Ok(())
