@@ -1,5 +1,5 @@
 pub mod http;
-mod mixer;
+pub mod mixer;
 
 extern crate gstreamer as gst;
 extern crate gstreamer_video as gst_video;

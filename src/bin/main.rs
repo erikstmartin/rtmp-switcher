@@ -1,10 +1,5 @@
-mod http;
-mod input;
-mod mixer;
-mod output;
-
 use gstreamer as gst;
-use http::Server;
+use switcher::http::Server;
 
 // TODO: Bring in Clap for command line arguments
 
