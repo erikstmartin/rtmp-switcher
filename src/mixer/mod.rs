@@ -13,7 +13,6 @@ use std::collections::HashMap;
 // - Inputs and Outputs may be audio only or video only.
 // - autoaudiosink does not play audio, even though it's in a playing state,
 // when used with RTMP sink
-// - Artifacting/discontinuity on RTMP feed but not autovideosink
 // - Handle dynamically changing pipeline while running
 //   - Use Idle PadProbe's in order to ensure we don't unlink elements during negotiations, etc.
 //   - Block src pads until ready.
@@ -34,6 +33,7 @@ pub struct Mixer {
     pub outputs: HashMap<String, Output>,
     audio_out: gst::Element,
     video_out: gst::Element,
+    join_handle: Option<std::thread::JoinHandle<()>>,
 }
 
 impl Mixer {
@@ -115,6 +115,7 @@ impl Mixer {
         Ok(Mixer {
             name: name.to_string(),
             pipeline: pipeline,
+            join_handle: None,
             audio_mixer: audio_mixer,
             video_mixer: video_mixer,
             inputs: HashMap::new(),
@@ -191,47 +192,68 @@ impl Mixer {
         Ok(())
     }
 
-    pub fn play(&self) -> Result<()> {
+    pub fn play(&mut self) -> Result<()> {
+        let p = self.pipeline.clone();
+        self.join_handle = Some(std::thread::spawn(move || watch_bus(p)));
+
         self.pipeline.set_state(gst::State::Playing)?;
+        Ok(())
+    }
 
-        // Wait until error or EOS
-        let bus = self.pipeline.get_bus().unwrap();
-        for msg in bus.iter_timed(gst::CLOCK_TIME_NONE) {
-            use gst::MessageView;
-            match msg.view() {
-                MessageView::Error(err) => {
-                    eprintln!(
-                        "Error received from element {:?} {}",
-                        err.get_src().map(|s| s.get_path_string()),
-                        err.get_error()
+    pub fn stop(&mut self) -> Result<()> {
+        self.pipeline.set_state(gst::State::Null)?;
+        self.join_handle.take().unwrap().join().unwrap();
+
+        Ok(())
+    }
+
+    pub fn generate_dot(&self) -> String {
+        self.pipeline
+            .debug_to_dot_data(gst::DebugGraphDetails::ALL)
+            .to_string()
+    }
+}
+
+fn watch_bus(pipeline: gst::Pipeline) {
+    // Wait until error or EOS
+    let bus = pipeline.get_bus().unwrap();
+    for msg in bus.iter_timed(gst::CLOCK_TIME_NONE) {
+        use gst::MessageView;
+        match msg.view() {
+            MessageView::Error(err) => {
+                eprintln!(
+                    "Error received from element {:?} {}",
+                    err.get_src().map(|s| s.get_path_string()),
+                    err.get_error()
+                );
+                eprintln!("Debugging information: {:?}", err.get_debug());
+                break;
+            }
+            MessageView::StateChanged(state_changed) => {
+                if state_changed
+                    .get_src()
+                    .map(|s| s == pipeline)
+                    .unwrap_or(false)
+                {
+                    println!(
+                        "Pipeline state changed from {:?} to {:?}",
+                        state_changed.get_old(),
+                        state_changed.get_current()
                     );
-                    eprintln!("Debugging information: {:?}", err.get_debug());
-                    break;
-                }
-                MessageView::StateChanged(state_changed) => {
-                    if state_changed
-                        .get_src()
-                        .map(|s| s == self.pipeline)
-                        .unwrap_or(false)
-                    {
-                        println!(
-                            "Pipeline state changed from {:?} to {:?}",
-                            state_changed.get_old(),
-                            state_changed.get_current()
-                        );
 
-                        self.pipeline.debug_to_dot_file(
-                            gst::DebugGraphDetails::VERBOSE,
-                            format!("{:?}", state_changed.get_current()),
-                        );
+                    pipeline.debug_to_dot_file(
+                        gst::DebugGraphDetails::VERBOSE,
+                        format!("{:?}", state_changed.get_current()),
+                    );
+
+                    match state_changed.get_current() {
+                        gst::State::Null => break,
+                        _ => continue,
                     }
                 }
-                MessageView::Eos(..) => break,
-                _ => (),
             }
+            MessageView::Eos(..) => break,
+            _ => (),
         }
-
-        self.pipeline.set_state(gst::State::Null)?;
-        Ok(())
     }
 }

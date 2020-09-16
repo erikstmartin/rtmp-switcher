@@ -69,10 +69,6 @@ impl Server {
             return Err(Error::Exists);
         }
 
-        let m = mixer.clone();
-        // TODO: Store JoinHandle somewhere
-        std::thread::spawn(move || m.lock().unwrap().play());
-
         self.mixers.insert(name.to_string(), mixer);
 
         Ok(())
@@ -108,7 +104,10 @@ impl Server {
 
 mod handlers {
     use std::convert::Infallible;
+    use std::io::Write;
+    use std::process::{Command, Stdio};
     use warp::http::StatusCode;
+    use warp::reply::Response;
 
     pub async fn mixer_create(
         mixer: super::Mixer,
@@ -133,6 +132,32 @@ mod handlers {
         };
 
         Ok(warp::reply::json(mixer))
+    }
+
+    pub async fn mixer_debug(
+        name: String,
+        server: super::Server,
+    ) -> Result<impl warp::Reply, Infallible> {
+        let mixer = server.mixers.get(name.as_str()).unwrap().lock().unwrap();
+
+        let mut cmd = Command::new("dot")
+            .arg("-Tsvg")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .expect("failed to execute process");
+
+        let stdin = cmd.stdin.as_mut().expect("Failed to open stdin");
+        stdin
+            .write_all(mixer.generate_dot().as_bytes())
+            .expect("Failed to write to stdin");
+
+        let output = cmd.wait_with_output().expect("Failed to read stdout");
+        Ok(warp::reply::with_header(
+            String::from_utf8(output.stdout).unwrap(),
+            "Content-Type",
+            "image/svg+xml",
+        ))
     }
 
     pub async fn mixer_list(server: super::Server) -> Result<impl warp::Reply, Infallible> {
@@ -217,6 +242,7 @@ mod filters {
         mixer_list(server.clone())
             .or(mixer_get(server.clone()))
             .or(mixer_create(server.clone()))
+            .or(mixer_debug(server.clone()))
             .or(input_list(server.clone()))
             .or(output_list(server.clone()))
     }
@@ -247,6 +273,15 @@ mod filters {
             .and(warp::get())
             .and(with_server(server))
             .and_then(handlers::mixer_get)
+    }
+
+    fn mixer_debug(
+        server: super::Server,
+    ) -> impl Filter<Extract = impl Reply, Error = warp::Rejection> + Clone {
+        warp::path!("mixers" / String / "debug")
+            .and(warp::get())
+            .and(with_server(server))
+            .and_then(handlers::mixer_debug)
     }
 
     fn input_list(
