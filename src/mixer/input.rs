@@ -50,6 +50,7 @@ impl Input {
 pub struct URI {
     pub name: String,
     pub location: String,
+    pipeline: Option<gst::Pipeline>,
     source: gst::Element,
     audioconvert: gst::Element,
     audioresample: gst::Element,
@@ -135,6 +136,7 @@ impl URI {
         Ok(Input::URI(Self {
             name: name.to_string(),
             location: name.to_string(),
+            pipeline: None,
             source,
             audioconvert,
             audioresample,
@@ -163,6 +165,8 @@ impl URI {
             &self.videoqueue,
         ])?;
 
+        self.pipeline = Some(pipeline);
+
         gst::Element::link_many(&[
             &self.audioconvert,
             &self.audioresample,
@@ -175,6 +179,15 @@ impl URI {
     }
 
     fn unlink(&self) -> Result<()> {
-        unimplemented!()
+        self.pipeline.as_ref().unwrap().remove_many(&[
+            &self.source,
+            &self.audioconvert,
+            &self.audioresample,
+            &self.audioqueue,
+            &self.videoconvert,
+            &self.videoqueue,
+        ])?;
+
+        Ok(())
     }
 }
