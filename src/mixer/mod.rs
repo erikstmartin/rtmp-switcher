@@ -11,6 +11,7 @@ use std::collections::HashMap;
 
 // TODO:
 // - Inputs and Outputs may be audio only or video only.
+// - Auto and RTMP sinks can't be used together or they get stuck in the Paused state.
 // - autoaudiosink does not play audio, even though it's in a playing state,
 // when used with RTMP sink
 // - Handle dynamically changing pipeline while running
