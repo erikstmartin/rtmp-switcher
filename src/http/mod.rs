@@ -1,9 +1,11 @@
 mod filters;
 mod handlers;
+
 use crate::mixer;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
@@ -48,12 +50,23 @@ pub struct Output {
 
 pub struct Server {
     pub mixers: Arc<Mutex<Mixers>>,
+    socket_addr: SocketAddr,
 }
 
 impl Server {
+    pub fn new_with_config(socket_addr: SocketAddr) -> Self {
+        Server {
+            socket_addr,
+            mixers: Arc::new(Mutex::new(Mixers {
+                mixers: HashMap::new(),
+            })),
+        }
+    }
+
     // TODO: Configuration for server
     pub fn new() -> Self {
         Server {
+            socket_addr: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 3030)),
             mixers: Arc::new(Mutex::new(Mixers {
                 mixers: HashMap::new(),
             })),
@@ -61,10 +74,8 @@ impl Server {
     }
 
     pub async fn run(&self) {
-        let addr: std::net::SocketAddr = "127.0.0.1:3030".parse().unwrap();
-
         warp::serve(filters::routes(self.mixers.clone()))
-            .run(addr)
+            .run(self.socket_addr)
             .await;
     }
 
