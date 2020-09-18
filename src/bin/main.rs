@@ -8,10 +8,9 @@ use thiserror::Error;
 enum RTMPSwitcherError {
     #[error("failed setting up gstreamer {0}")]
     FailedInitGstreamer(#[from] gst::glib::Error),
+
     #[error("invalid listen address `{0}`")]
     InvalidSocketAddr(String),
-    #[error("missing listen address")]
-    MissingListenAddr,
 }
 
 #[tokio::main]
@@ -28,11 +27,10 @@ async fn main() -> eyre::Result<()> {
                 .takes_value(true),
         )
         .get_matches();
-    let addr: SocketAddr = parse_addr(
-        matches
-            .value_of("addr")
-            .ok_or(RTMPSwitcherError::MissingListenAddr)?,
-    )?;
+    let addr: SocketAddr = parse_addr(matches.value_of("addr").unwrap_or({
+        eprintln!("using 0.0.0.0:3030 as addr");
+        "0.0.0.0:3030"
+    }))?;
 
     gst::init().map_err(RTMPSwitcherError::FailedInitGstreamer)?;
 
