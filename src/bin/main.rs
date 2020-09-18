@@ -16,7 +16,7 @@ enum RTMPSwitcherError {
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
     let matches = App::new("rtmpswitcher")
-        .version("0.0.1")
+        .version("0.1.0")
         .about("It switches things")
         .arg(
             Arg::with_name("addr")

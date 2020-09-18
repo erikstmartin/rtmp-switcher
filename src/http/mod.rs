@@ -28,21 +28,43 @@ pub enum Error {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Mixer {
+pub struct MixerCreateRequest {
+    pub name: String,
+    pub framerate: Option<i32>,
+    pub width: Option<i32>,
+    pub height: Option<i32>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct MixerResponse {
     pub name: String,
     pub input_count: usize,
     pub output_count: usize,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Input {
+pub struct InputCreateRequest {
     pub name: String,
     pub input_type: String,
     pub location: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Output {
+pub struct InputResponse {
+    pub name: String,
+    pub input_type: String,
+    pub location: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct OutputCreateRequest {
+    pub name: String,
+    pub output_type: String,
+    pub location: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct OutputResponse {
     pub name: String,
     pub output_type: String,
     pub location: String,
@@ -63,7 +85,6 @@ impl Server {
         }
     }
 
-    // TODO: Configuration for server
     pub fn new() -> Self {
         Server {
             socket_addr: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 3030)),
@@ -79,8 +100,8 @@ impl Server {
             .await;
     }
 
-    pub fn mixer_create(&mut self, name: &str) -> Result<(), Error> {
-        self.mixers.lock().unwrap().mixer_create(name)
+    pub fn mixer_create(&mut self, config: mixer::Config) -> Result<(), Error> {
+        self.mixers.lock().unwrap().mixer_create(config)
     }
 
     pub fn input_add(&mut self, mixer: &str, input: mixer::Input) -> Result<(), Error> {
@@ -97,19 +118,21 @@ pub struct Mixers {
 }
 
 impl Mixers {
-    pub fn mixer_create(&mut self, name: &str) -> Result<(), Error> {
+    pub fn mixer_create(&mut self, config: mixer::Config) -> Result<(), Error> {
         let re = Regex::new(r"^[a-zA-Z0-9-]+$").unwrap();
-        if !re.is_match(name) {
+        if !re.is_match(config.name.as_str()) {
             return Err(Error::InvalidName);
         }
-        let mut mixer = mixer::Mixer::new(name)?;
 
-        if self.mixers.contains_key(name) {
+        let name = config.name.clone();
+        let mut mixer = mixer::Mixer::new(config)?;
+
+        if self.mixers.contains_key(name.as_str()) {
             return Err(Error::Exists);
         }
 
         mixer.play()?;
-        self.mixers.insert(name.to_string(), mixer);
+        self.mixers.insert(name, mixer);
 
         Ok(())
     }

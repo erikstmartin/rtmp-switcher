@@ -8,21 +8,23 @@ fn with_mixers(
     warp::any().map(move || mixers.clone())
 }
 
-fn mixer_json_body() -> impl Filter<Extract = (super::Mixer,), Error = warp::Rejection> + Clone {
+fn mixer_json_body(
+) -> impl Filter<Extract = (super::MixerCreateRequest,), Error = warp::Rejection> + Clone {
     // When accepting a body, we want a JSON body
     // (and to reject huge payloads)...
     warp::body::content_length_limit(1024 * 16).and(warp::body::json())
 }
 
 // TODO: Can we use generics so that we don't need to duplicate this?
-fn input_json_body() -> impl Filter<Extract = (super::Input,), Error = warp::Rejection> + Clone {
+fn input_json_body(
+) -> impl Filter<Extract = (super::InputCreateRequest,), Error = warp::Rejection> + Clone {
     // When accepting a body, we want a JSON body
     // (and to reject huge payloads)...
     warp::body::content_length_limit(1024 * 16).and(warp::body::json())
 }
 
-// TODO: Can we use generics so that we don't need to duplicate this?
-fn output_json_body() -> impl Filter<Extract = (super::Output,), Error = warp::Rejection> + Clone {
+fn output_json_body(
+) -> impl Filter<Extract = (super::OutputCreateRequest,), Error = warp::Rejection> + Clone {
     // When accepting a body, we want a JSON body
     // (and to reject huge payloads)...
     warp::body::content_length_limit(1024 * 16).and(warp::body::json())

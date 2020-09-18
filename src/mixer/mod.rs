@@ -9,19 +9,16 @@ pub use input::Input;
 pub use output::Output;
 use std::collections::HashMap;
 
-// TODO:
-// - Inputs and Outputs may be audio only or video only.
-// - Handle dynamically changing pipeline while running
-//   - Use Idle PadProbe's in order to ensure we don't unlink elements during negotiations, etc.
-//   - Block src pads until ready.
-// - Figure out why some input videos work and others fail (mismatch between sample rate of audio)
-// - Better comments
-//
-// - Network resilience (need to reset from paused to play)
-// https://gstreamer.freedesktop.org/documentation/tutorials/basic/streaming.html?gi-language=c
+#[derive(Clone)]
+pub struct Config {
+    pub name: String,
+    pub framerate: Option<i32>,
+    pub width: Option<i32>,
+    pub height: Option<i32>,
+}
 
 pub struct Mixer {
-    pub name: String,
+    config: Config,
     pipeline: gst::Pipeline,
     audio_mixer: gst::Element,
     video_mixer: gst::Element,
@@ -33,15 +30,23 @@ pub struct Mixer {
 }
 
 impl Mixer {
-    pub fn new(name: &str) -> Result<Self> {
+    pub fn default_config() -> Config {
+        Config {
+            name: "".to_string(),
+            framerate: Some(30),
+            width: Some(1920),
+            height: Some(1080),
+        }
+    }
+
+    pub fn new(config: Config) -> Result<Self> {
         let background_enabled = true;
-        let pipeline = gst::Pipeline::new(Some(name));
+        let pipeline = gst::Pipeline::new(Some(config.name.as_str()));
 
         // Create Video Channel
         let video_capsfilter = gst::ElementFactory::make("capsfilter", Some("video_capsfilter"))?;
         let video_mixer = gst::ElementFactory::make("compositor", Some("videomixer"))?;
         let video_caps = gst::Caps::builder("video/x-raw")
-            // TODO:.field("format", &gst_video::VideoFormat::Rgba.to_str())
             .field("framerate", &gst::Fraction::new(30, 1))
             .build();
         video_capsfilter.set_property("caps", &video_caps).unwrap();
@@ -111,7 +116,7 @@ impl Mixer {
         }
 
         Ok(Mixer {
-            name: name.to_string(),
+            config,
             pipeline,
             join_handle: None,
             audio_mixer,
@@ -146,9 +151,6 @@ impl Mixer {
         Ok(())
     }
 
-    // traverse pads->peers until we hit audio or video mixer.
-    // Don't remove mixer element
-    // TODO: release pad from mixer
     pub fn input_remove(&mut self, name: &str) -> Result<()> {
         if !self.inputs.contains_key(name) {
             return Err(Error::NotFound("input".to_string(), name.to_string()));
@@ -217,6 +219,10 @@ impl Mixer {
         self.pipeline
             .debug_to_dot_data(gst::DebugGraphDetails::ALL)
             .to_string()
+    }
+
+    pub fn name(&self) -> String {
+        self.config.name.clone()
     }
 }
 
