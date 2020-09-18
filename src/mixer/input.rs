@@ -187,7 +187,7 @@ impl URI {
         ])?;
         gst::Element::link_many(&[&self.videoconvert, &self.videoqueue, &video])?;
 
-        return Ok(());
+        Ok(())
     }
 
     fn unlink(&self) -> Result<()> {
@@ -248,7 +248,7 @@ impl Test {
         gst::Element::link_many(&[&self.audio, &audio])?;
         gst::Element::link_many(&[&self.video, &video])?;
 
-        return Ok(());
+        Ok(())
     }
 
     fn unlink(&self) -> Result<()> {
@@ -302,7 +302,7 @@ impl Fake {
         gst::Element::link_many(&[&self.audio, &audio])?;
         gst::Element::link_many(&[&self.video, &video])?;
 
-        return Ok(());
+        Ok(())
     }
 
     fn unlink(&self) -> Result<()> {

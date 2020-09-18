@@ -115,10 +115,10 @@ impl Mixer {
 
         Ok(Mixer {
             name: name.to_string(),
-            pipeline: pipeline,
+            pipeline,
             join_handle: None,
-            audio_mixer: audio_mixer,
-            video_mixer: video_mixer,
+            audio_mixer,
+            video_mixer,
             inputs: HashMap::new(),
             outputs: HashMap::new(),
             audio_out: audio_tee,
