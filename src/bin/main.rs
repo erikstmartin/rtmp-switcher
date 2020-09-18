@@ -8,8 +8,10 @@ use thiserror::Error;
 enum RTMPSwitcherError {
     #[error("failed setting up gstreamer {0}")]
     FailedInitGstreamer(#[from] gst::glib::Error),
+
     #[error("invalid listen address `{0}`")]
     InvalidSocketAddr(String),
+
     #[error("missing listen address")]
     MissingListenAddr,
 }
@@ -17,7 +19,7 @@ enum RTMPSwitcherError {
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
     let matches = App::new("rtmpswitcher")
-        .version("0.0.1")
+        .version("0.1.0")
         .about("It switches things")
         .arg(
             Arg::with_name("addr")

@@ -9,7 +9,14 @@ pub async fn mixer_create(
     mixer: super::MixerCreateRequest,
     mixers: Arc<Mutex<super::Mixers>>,
 ) -> Result<impl warp::Reply, Infallible> {
-    match mixers.lock().unwrap().mixer_create(&mixer.name) {
+    let config = mixer::Config {
+        name: mixer.name,
+        framerate: mixer.framerate,
+        width: mixer.width,
+        height: mixer.height,
+    };
+
+    match mixers.lock().unwrap().mixer_create(config) {
         Ok(_) => Ok(StatusCode::CREATED),
         Err(_) => Ok(StatusCode::INTERNAL_SERVER_ERROR),
     }
@@ -23,7 +30,7 @@ pub async fn mixer_get(
     let mixer = mixers.mixers.get(name.as_str()).unwrap();
 
     let mixer = &super::MixerResponse {
-        name: mixer.name.clone(),
+        name: mixer.name(),
         input_count: mixer.input_count(),
         output_count: mixer.output_count(),
     };
@@ -65,7 +72,7 @@ pub async fn mixer_list(mixers: Arc<Mutex<super::Mixers>>) -> Result<impl warp::
         .mixers
         .iter()
         .map(|(_, m)| super::MixerResponse {
-            name: m.name.clone(),
+            name: m.name(),
             input_count: m.input_count(),
             output_count: m.output_count(),
         })

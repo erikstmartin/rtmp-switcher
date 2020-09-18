@@ -9,8 +9,16 @@ pub use input::Input;
 pub use output::Output;
 use std::collections::HashMap;
 
-pub struct Mixer {
+#[derive(Clone)]
+pub struct Config {
     pub name: String,
+    pub framerate: Option<i32>,
+    pub width: Option<i32>,
+    pub height: Option<i32>,
+}
+
+pub struct Mixer {
+    config: Config,
     pipeline: gst::Pipeline,
     audio_mixer: gst::Element,
     video_mixer: gst::Element,
@@ -22,15 +30,23 @@ pub struct Mixer {
 }
 
 impl Mixer {
-    pub fn new(name: &str) -> Result<Self> {
+    pub fn default_config() -> Config {
+        Config {
+            name: "".to_string(),
+            framerate: Some(30),
+            width: Some(1920),
+            height: Some(1080),
+        }
+    }
+
+    pub fn new(config: Config) -> Result<Self> {
         let background_enabled = true;
-        let pipeline = gst::Pipeline::new(Some(name));
+        let pipeline = gst::Pipeline::new(Some(config.name.as_str()));
 
         // Create Video Channel
         let video_capsfilter = gst::ElementFactory::make("capsfilter", Some("video_capsfilter"))?;
         let video_mixer = gst::ElementFactory::make("compositor", Some("videomixer"))?;
         let video_caps = gst::Caps::builder("video/x-raw")
-            // TODO:.field("format", &gst_video::VideoFormat::Rgba.to_str())
             .field("framerate", &gst::Fraction::new(30, 1))
             .build();
         video_capsfilter.set_property("caps", &video_caps).unwrap();
@@ -100,7 +116,7 @@ impl Mixer {
         }
 
         Ok(Mixer {
-            name: name.to_string(),
+            config,
             pipeline,
             join_handle: None,
             audio_mixer,
@@ -203,6 +219,10 @@ impl Mixer {
         self.pipeline
             .debug_to_dot_data(gst::DebugGraphDetails::ALL)
             .to_string()
+    }
+
+    pub fn name(&self) -> String {
+        self.config.name.clone()
     }
 }
 
