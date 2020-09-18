@@ -5,6 +5,7 @@ use gstreamer as gst;
 pub enum Output {
     RTMP(RTMP),
     Auto(Auto),
+    Fake(Fake),
 }
 
 impl Output {
@@ -12,6 +13,7 @@ impl Output {
         match self {
             Output::RTMP(output) => output.name(),
             Output::Auto(output) => output.name(),
+            Output::Fake(output) => output.name(),
         }
     }
 
@@ -19,6 +21,7 @@ impl Output {
         match self {
             Output::RTMP(_) => "RTMP".to_string(),
             Output::Auto(_) => "Auto".to_string(),
+            Output::Fake(_) => "Fake".to_string(),
         }
     }
 
@@ -26,6 +29,7 @@ impl Output {
         match self {
             Output::RTMP(output) => output.location.clone(),
             Output::Auto(_) => "".to_string(),
+            Output::Fake(_) => "".to_string(),
         }
     }
 
@@ -38,6 +42,7 @@ impl Output {
         match self {
             Output::RTMP(output) => output.link(pipeline, audio, video),
             Output::Auto(output) => output.link(pipeline, audio, video),
+            Output::Fake(output) => output.link(pipeline, audio, video),
         }
     }
 
@@ -45,6 +50,7 @@ impl Output {
         match self {
             Output::RTMP(output) => output.unlink(),
             Output::Auto(output) => output.unlink(),
+            Output::Fake(output) => output.unlink(),
         }
     }
 }
@@ -353,6 +359,58 @@ impl RTMP {
             &self.aacparse,
         ])?;
 
+        Ok(())
+    }
+}
+
+pub struct Fake {
+    pub name: String,
+    pipeline: Option<gst::Pipeline>,
+    audio: gst::Element,
+    video: gst::Element,
+}
+
+impl Fake {
+    pub fn new(name: &str) -> Result<Output> {
+        let audio =
+            gst::ElementFactory::make("fakesink", Some(format!("{}_audio_sink", name).as_str()))?;
+
+        let video =
+            gst::ElementFactory::make("fakesink", Some(format!("{}_video_sink", name).as_str()))?;
+
+        Ok(Output::Fake(Fake {
+            name: name.to_string(),
+            pipeline: None,
+            audio,
+            video,
+        }))
+    }
+
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn link(
+        &mut self,
+        pipeline: gst::Pipeline,
+        audio: gst::Element,
+        video: gst::Element,
+    ) -> Result<()> {
+        pipeline.add_many(&[&self.audio, &self.video])?;
+
+        self.pipeline = Some(pipeline);
+
+        gst::Element::link_many(&[&audio, &self.audio])?;
+        gst::Element::link_many(&[&video, &self.video])?;
+
+        return Ok(());
+    }
+
+    fn unlink(&self) -> Result<()> {
+        self.pipeline
+            .as_ref()
+            .unwrap()
+            .remove_many(&[&self.audio, &self.video])?;
         Ok(())
     }
 }

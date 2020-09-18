@@ -4,6 +4,8 @@ use gstreamer as gst;
 
 pub enum Input {
     URI(URI),
+    Test(Test),
+    Fake(Fake),
 }
 
 impl Input {
@@ -14,18 +16,24 @@ impl Input {
     pub fn name(&self) -> String {
         match self {
             Input::URI(input) => input.name(),
+            Input::Test(input) => input.name(),
+            Input::Fake(input) => input.name(),
         }
     }
 
     pub fn location(&self) -> String {
         match self {
             Input::URI(input) => input.location.clone(),
+            Input::Test(_) => "".to_string(),
+            Input::Fake(_) => "".to_string(),
         }
     }
 
     pub fn input_type(&self) -> String {
         match self {
             Input::URI(_) => "URI".to_string(),
+            Input::Test(_) => "Test".to_string(),
+            Input::Fake(_) => "Fake".to_string(),
         }
     }
 
@@ -37,12 +45,16 @@ impl Input {
     ) -> Result<()> {
         match self {
             Input::URI(input) => input.link(pipeline, audio, video),
+            Input::Test(input) => input.link(pipeline, audio, video),
+            Input::Fake(input) => input.link(pipeline, audio, video),
         }
     }
 
     pub fn unlink(&self) -> Result<()> {
         match self {
             Input::URI(input) => input.unlink(),
+            Input::Test(input) => input.unlink(),
+            Input::Fake(input) => input.unlink(),
         }
     }
 }
@@ -188,6 +200,116 @@ impl URI {
             &self.videoqueue,
         ])?;
 
+        Ok(())
+    }
+}
+
+pub struct Test {
+    pub name: String,
+    pipeline: Option<gst::Pipeline>,
+    audio: gst::Element,
+    video: gst::Element,
+}
+
+impl Test {
+    pub fn new(name: &str) -> Result<Input> {
+        let audio = gst::ElementFactory::make(
+            "audiotestsrc",
+            Some(format!("{}_audio_source", name).as_str()),
+        )?;
+
+        let video = gst::ElementFactory::make(
+            "videotestsrc",
+            Some(format!("{}_video_source", name).as_str()),
+        )?;
+
+        Ok(Input::Test(Test {
+            name: name.to_string(),
+            pipeline: None,
+            audio,
+            video,
+        }))
+    }
+
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn link(
+        &mut self,
+        pipeline: gst::Pipeline,
+        audio: gst::Element,
+        video: gst::Element,
+    ) -> Result<()> {
+        pipeline.add_many(&[&self.audio, &self.video])?;
+
+        self.pipeline = Some(pipeline);
+
+        gst::Element::link_many(&[&self.audio, &audio])?;
+        gst::Element::link_many(&[&self.video, &video])?;
+
+        return Ok(());
+    }
+
+    fn unlink(&self) -> Result<()> {
+        self.pipeline
+            .as_ref()
+            .unwrap()
+            .remove_many(&[&self.audio, &self.video])?;
+        Ok(())
+    }
+}
+
+pub struct Fake {
+    pub name: String,
+    pipeline: Option<gst::Pipeline>,
+    audio: gst::Element,
+    video: gst::Element,
+}
+
+impl Fake {
+    pub fn new(name: &str) -> Result<Input> {
+        let audio =
+            gst::ElementFactory::make("fakesrc", Some(format!("{}_audio_source", name).as_str()))?;
+        audio.set_property("is-live", &true)?;
+
+        let video =
+            gst::ElementFactory::make("fakesrc", Some(format!("{}_video_source", name).as_str()))?;
+        video.set_property("is-live", &true)?;
+
+        Ok(Input::Fake(Fake {
+            name: name.to_string(),
+            pipeline: None,
+            audio,
+            video,
+        }))
+    }
+
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn link(
+        &mut self,
+        pipeline: gst::Pipeline,
+        audio: gst::Element,
+        video: gst::Element,
+    ) -> Result<()> {
+        pipeline.add_many(&[&self.audio, &self.video])?;
+
+        self.pipeline = Some(pipeline);
+
+        gst::Element::link_many(&[&self.audio, &audio])?;
+        gst::Element::link_many(&[&self.video, &video])?;
+
+        return Ok(());
+    }
+
+    fn unlink(&self) -> Result<()> {
+        self.pipeline
+            .as_ref()
+            .unwrap()
+            .remove_many(&[&self.audio, &self.video])?;
         Ok(())
     }
 }

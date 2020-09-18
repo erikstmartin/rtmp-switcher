@@ -272,8 +272,7 @@ mod tests {
         server
             .input_add(
                 mixer_name,
-                // TODO: Replace this with a testsrc
-                mixer::input::URI::new("sintel", "https://www.freedesktop.org/software/gstreamer-sdk/data/media/sintel_trailer-480p.webm").expect("Failed to build Input from uri"),
+                mixer::input::Fake::new("fakesrc").expect("failed to create fakesrc"),
             )
             .expect("Failed to add input");
 
@@ -281,7 +280,7 @@ mod tests {
 
         let resp = request()
             .method("GET")
-            .path("/mixers/test/inputs/sintel")
+            .path("/mixers/test/inputs/fakesrc")
             .reply(&api)
             .await;
 
@@ -299,8 +298,7 @@ mod tests {
         server
             .input_add(
                 mixer_name,
-                // TODO: Replace this with a testsrc
-                mixer::input::URI::new("sintel", "https://www.freedesktop.org/software/gstreamer-sdk/data/media/sintel_trailer-480p.webm").expect("Failed to build Input from uri"),
+                mixer::input::Fake::new("fakesrc").expect("failed to create fakesrc"),
             )
             .expect("Failed to add input");
 
@@ -308,7 +306,7 @@ mod tests {
 
         let resp = request()
             .method("DELETE")
-            .path("/mixers/test/inputs/sintel")
+            .path("/mixers/test/inputs/fakesrc")
             .reply(&api)
             .await;
 
@@ -354,7 +352,7 @@ mod tests {
             .path("/mixers/test/outputs")
             .json(&super::Output {
                 name: "test".to_string(),
-                output_type: "Auto".to_string(),
+                output_type: "Fake".to_string(),
                 location: "http://nowhere".to_string(),
             })
             .reply(&api)
@@ -385,8 +383,7 @@ mod tests {
         server
             .output_add(
                 mixer_name,
-                // TODO: Replace this with a fakesink
-                mixer::output::Auto::new("auto").expect("Failed to build Output"),
+                mixer::output::Fake::new("fake").expect("failed to create fake output"),
             )
             .expect("Failed to add output");
 
@@ -394,7 +391,7 @@ mod tests {
 
         let resp = request()
             .method("GET")
-            .path("/mixers/test/outputs/auto")
+            .path("/mixers/test/outputs/fake")
             .reply(&api)
             .await;
 
@@ -412,8 +409,7 @@ mod tests {
         server
             .output_add(
                 mixer_name,
-                // TODO: Replace this with a fakesink
-                mixer::output::Auto::new("auto").expect("Failed to build Output"),
+                mixer::output::Fake::new("fake").expect("failed to create fake output"),
             )
             .expect("Failed to add output");
 
@@ -421,7 +417,7 @@ mod tests {
 
         let resp = request()
             .method("DELETE")
-            .path("/mixers/test/outputs/auto")
+            .path("/mixers/test/outputs/fake")
             .reply(&api)
             .await;
 

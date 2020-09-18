@@ -81,6 +81,8 @@ pub async fn input_add(
     let input = match input.input_type.as_str() {
         "URI" => crate::mixer::input::URI::new(&input.name, &input.location)
             .map_err(|e| super::Error::Mixer(e)),
+        "Fake" => crate::mixer::input::Fake::new(&input.name).map_err(|e| super::Error::Mixer(e)),
+        "Test" => crate::mixer::input::Test::new(&input.name).map_err(|e| super::Error::Mixer(e)),
         _ => Err(super::Error::Unknown),
     };
 
@@ -189,6 +191,7 @@ pub async fn output_add(
         "Auto" => crate::mixer::output::Auto::new(&output.name).map_err(|e| super::Error::Mixer(e)),
         "RTMP" => crate::mixer::output::RTMP::new(&output.name, &output.location)
             .map_err(|e| super::Error::Mixer(e)),
+        "Fake" => crate::mixer::output::Fake::new(&output.name).map_err(|e| super::Error::Mixer(e)),
         _ => Err(super::Error::Unknown),
     };
 
