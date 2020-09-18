@@ -113,10 +113,8 @@ impl Mixers {
     pub fn input_remove(&mut self, mixer: &str, input: &str) -> Result<(), Error> {
         let mixer = self.mixers.get_mut(mixer).ok_or(Error::NotFound)?;
 
-        match mixer.inputs.remove(input) {
-            Some(_) => Ok(()),
-            None => Err(Error::NotFound),
-        }
+        mixer.input_remove(input)?;
+        Ok(())
     }
 
     pub fn output_add(&mut self, mixer: &str, output: mixer::Output) -> Result<(), Error> {
@@ -132,10 +130,8 @@ impl Mixers {
     pub fn output_remove(&mut self, mixer: &str, output: &str) -> Result<(), Error> {
         let mixer = self.mixers.get_mut(mixer).ok_or(Error::NotFound)?;
 
-        match mixer.outputs.remove(output) {
-            Some(_) => Ok(()),
-            None => Err(Error::NotFound),
-        }
+        mixer.output_remove(output)?;
+        Ok(())
     }
 }
 

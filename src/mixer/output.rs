@@ -165,6 +165,9 @@ impl Auto {
     }
 
     fn unlink(&self) -> Result<()> {
+        release_request_pad(&self.audioqueue)?;
+        release_request_pad(&self.videoqueue)?;
+
         self.pipeline.as_ref().unwrap().remove_many(&[
             &self.audioqueue,
             &self.audiosink,
@@ -358,6 +361,9 @@ impl RTMP {
     }
 
     fn unlink(&self) -> Result<()> {
+        release_request_pad(&self.audio_queue)?;
+        release_request_pad(&self.video_queue)?;
+
         let pipeline = self.pipeline.as_ref().unwrap();
         pipeline.remove_many(&[
             &self.video_queue,
@@ -446,10 +452,13 @@ impl Fake {
         gst::Element::link_many(&[&audio, &self.audio])?;
         gst::Element::link_many(&[&video, &self.video])?;
 
-        return Ok(());
+        Ok(())
     }
 
     fn unlink(&self) -> Result<()> {
+        release_request_pad(&self.audio)?;
+        release_request_pad(&self.video)?;
+
         self.pipeline
             .as_ref()
             .unwrap()
@@ -462,4 +471,17 @@ impl Fake {
         self.video.set_state(state)?;
         Ok(())
     }
+}
+
+fn release_request_pad(elem: &gst::Element) -> Result<()> {
+    let pad = elem.get_static_pad("sink").unwrap();
+    if pad.is_linked() {
+        let peer_pad = pad.get_peer().unwrap();
+        peer_pad
+            .get_parent_element()
+            .unwrap()
+            .release_request_pad(&peer_pad);
+    }
+
+    Ok(())
 }

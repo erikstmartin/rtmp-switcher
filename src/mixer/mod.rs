@@ -11,15 +11,11 @@ use std::collections::HashMap;
 
 // TODO:
 // - Inputs and Outputs may be audio only or video only.
-// - Auto and RTMP sinks can't be used together or they get stuck in the Paused state.
-// - autoaudiosink does not play audio, even though it's in a playing state,
-// when used with RTMP sink
 // - Handle dynamically changing pipeline while running
 //   - Use Idle PadProbe's in order to ensure we don't unlink elements during negotiations, etc.
 //   - Block src pads until ready.
 // - Figure out why some input videos work and others fail (mismatch between sample rate of audio)
 // - Better comments
-// - Tests (eeeeek!)
 //
 // - Network resilience (need to reset from paused to play)
 // https://gstreamer.freedesktop.org/documentation/tutorials/basic/streaming.html?gi-language=c
@@ -159,6 +155,7 @@ impl Mixer {
         }
 
         let input = self.inputs.get_mut(name).unwrap();
+        input.set_state(gst::State::Null)?;
         input.unlink()?;
         self.inputs.remove(name);
 
@@ -194,6 +191,7 @@ impl Mixer {
         }
 
         let output = self.outputs.get_mut(name).unwrap();
+        output.set_state(gst::State::Null)?;
         output.unlink()?;
         self.outputs.remove(name);
 

@@ -199,6 +199,9 @@ impl URI {
     }
 
     fn unlink(&self) -> Result<()> {
+        release_request_pad(&self.audioqueue)?;
+        release_request_pad(&self.videoqueue)?;
+
         self.pipeline.as_ref().unwrap().remove_many(&[
             &self.source,
             &self.audioconvert,
@@ -270,6 +273,9 @@ impl Test {
     }
 
     fn unlink(&self) -> Result<()> {
+        release_request_pad(&self.audio)?;
+        release_request_pad(&self.video)?;
+
         self.pipeline
             .as_ref()
             .unwrap()
@@ -329,6 +335,9 @@ impl Fake {
     }
 
     fn unlink(&self) -> Result<()> {
+        release_request_pad(&self.audio)?;
+        release_request_pad(&self.video)?;
+
         self.pipeline
             .as_ref()
             .unwrap()
@@ -341,4 +350,17 @@ impl Fake {
         self.video.set_state(state)?;
         Ok(())
     }
+}
+
+fn release_request_pad(elem: &gst::Element) -> Result<()> {
+    let pad = elem.get_static_pad("src").unwrap();
+    if pad.is_linked() {
+        let peer_pad = pad.get_peer().unwrap();
+        peer_pad
+            .get_parent_element()
+            .unwrap()
+            .release_request_pad(&peer_pad);
+    }
+
+    Ok(())
 }
