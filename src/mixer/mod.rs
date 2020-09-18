@@ -9,17 +9,6 @@ pub use input::Input;
 pub use output::Output;
 use std::collections::HashMap;
 
-// TODO:
-// - Inputs and Outputs may be audio only or video only.
-// - Handle dynamically changing pipeline while running
-//   - Use Idle PadProbe's in order to ensure we don't unlink elements during negotiations, etc.
-//   - Block src pads until ready.
-// - Figure out why some input videos work and others fail (mismatch between sample rate of audio)
-// - Better comments
-//
-// - Network resilience (need to reset from paused to play)
-// https://gstreamer.freedesktop.org/documentation/tutorials/basic/streaming.html?gi-language=c
-
 pub struct Mixer {
     pub name: String,
     pipeline: gst::Pipeline,
@@ -146,9 +135,6 @@ impl Mixer {
         Ok(())
     }
 
-    // traverse pads->peers until we hit audio or video mixer.
-    // Don't remove mixer element
-    // TODO: release pad from mixer
     pub fn input_remove(&mut self, name: &str) -> Result<()> {
         if !self.inputs.contains_key(name) {
             return Err(Error::NotFound("input".to_string(), name.to_string()));

@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use warp::http::StatusCode;
 
 pub async fn mixer_create(
-    mixer: super::Mixer,
+    mixer: super::MixerCreateRequest,
     mixers: Arc<Mutex<super::Mixers>>,
 ) -> Result<impl warp::Reply, Infallible> {
     match mixers.lock().unwrap().mixer_create(&mixer.name) {
@@ -22,7 +22,7 @@ pub async fn mixer_get(
     let mixers = mixers.lock().unwrap();
     let mixer = mixers.mixers.get(name.as_str()).unwrap();
 
-    let mixer = &super::Mixer {
+    let mixer = &super::MixerResponse {
         name: mixer.name.clone(),
         input_count: mixer.input_count(),
         output_count: mixer.output_count(),
@@ -59,12 +59,12 @@ pub async fn mixer_debug(
 }
 
 pub async fn mixer_list(mixers: Arc<Mutex<super::Mixers>>) -> Result<impl warp::Reply, Infallible> {
-    let mixers: Vec<super::Mixer> = mixers
+    let mixers: Vec<super::MixerResponse> = mixers
         .lock()
         .unwrap()
         .mixers
         .iter()
-        .map(|(_, m)| super::Mixer {
+        .map(|(_, m)| super::MixerResponse {
             name: m.name.clone(),
             input_count: m.input_count(),
             output_count: m.output_count(),
@@ -75,7 +75,7 @@ pub async fn mixer_list(mixers: Arc<Mutex<super::Mixers>>) -> Result<impl warp::
 
 pub async fn input_add(
     mixer: String,
-    input: super::Input,
+    input: super::InputCreateRequest,
     mixers: Arc<Mutex<super::Mixers>>,
 ) -> Result<impl warp::Reply, Infallible> {
     let input = match input.input_type.as_str() {
@@ -96,7 +96,7 @@ pub async fn input_list(
     mixer_name: String,
     mixers: Arc<Mutex<super::Mixers>>,
 ) -> Result<impl warp::Reply, Infallible> {
-    let inputs: Vec<super::Input> = mixers
+    let inputs: Vec<super::InputResponse> = mixers
         .lock()
         .unwrap()
         .mixers
@@ -104,7 +104,7 @@ pub async fn input_list(
         .unwrap()
         .inputs
         .iter()
-        .map(|(_, input)| super::Input {
+        .map(|(_, input)| super::InputResponse {
             name: input.name(),
             input_type: input.input_type(),
             location: input.location(),
@@ -134,7 +134,7 @@ pub async fn input_get(
     }
 
     let input = input.unwrap();
-    let input = super::Input {
+    let input = super::InputResponse {
         name: input.name(),
         input_type: input.input_type(),
         location: input.location(),
@@ -165,7 +165,7 @@ pub async fn output_list(
     name: String,
     mixers: Arc<Mutex<super::Mixers>>,
 ) -> Result<impl warp::Reply, Infallible> {
-    let outputs: Vec<super::Output> = mixers
+    let outputs: Vec<super::OutputResponse> = mixers
         .lock()
         .unwrap()
         .mixers
@@ -173,7 +173,7 @@ pub async fn output_list(
         .unwrap()
         .outputs
         .iter()
-        .map(|(_, output)| super::Output {
+        .map(|(_, output)| super::OutputResponse {
             name: output.name(),
             output_type: output.output_type(),
             location: output.location(),
@@ -184,7 +184,7 @@ pub async fn output_list(
 
 pub async fn output_add(
     mixer: String,
-    output: super::Output,
+    output: super::OutputCreateRequest,
     mixers: Arc<Mutex<super::Mixers>>,
 ) -> Result<impl warp::Reply, Infallible> {
     let output = match output.output_type.as_str() {
@@ -222,7 +222,7 @@ pub async fn output_get(
     }
 
     let output = output.unwrap();
-    let output = super::Output {
+    let output = super::OutputResponse {
         name: output.name(),
         output_type: output.output_type(),
         location: output.location(),

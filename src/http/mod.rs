@@ -28,21 +28,40 @@ pub enum Error {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Mixer {
+pub struct MixerCreateRequest {
+    pub name: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct MixerResponse {
     pub name: String,
     pub input_count: usize,
     pub output_count: usize,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Input {
+pub struct InputCreateRequest {
     pub name: String,
     pub input_type: String,
     pub location: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Output {
+pub struct InputResponse {
+    pub name: String,
+    pub input_type: String,
+    pub location: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct OutputCreateRequest {
+    pub name: String,
+    pub output_type: String,
+    pub location: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct OutputResponse {
     pub name: String,
     pub output_type: String,
     pub location: String,
@@ -63,7 +82,6 @@ impl Server {
         }
     }
 
-    // TODO: Configuration for server
     pub fn new() -> Self {
         Server {
             socket_addr: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 3030)),
