@@ -230,11 +230,16 @@ fn watch_bus(pipeline: gst::Pipeline) {
         match msg.view() {
             MessageView::Error(err) => {
                 eprintln!(
-                    "Error received from element {:?} {}",
+                    "{}: Error received from element {:?} {}",
+                    pipeline.get_name(),
                     err.get_src().map(|s| s.get_path_string()),
                     err.get_error()
                 );
-                eprintln!("Debugging information: {:?}", err.get_debug());
+                eprintln!(
+                    "{}: Debugging information: {:?}",
+                    pipeline.get_name(),
+                    err.get_debug()
+                );
                 break;
             }
             MessageView::StateChanged(state_changed) => {
@@ -244,14 +249,10 @@ fn watch_bus(pipeline: gst::Pipeline) {
                     .unwrap_or(false)
                 {
                     println!(
-                        "Pipeline state changed from {:?} to {:?}",
+                        "{}: Pipeline state changed from {:?} to {:?}",
+                        pipeline.get_name(),
                         state_changed.get_old(),
                         state_changed.get_current()
-                    );
-
-                    pipeline.debug_to_dot_file(
-                        gst::DebugGraphDetails::VERBOSE,
-                        format!("{:?}", state_changed.get_current()),
                     );
 
                     match state_changed.get_current() {
