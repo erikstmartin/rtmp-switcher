@@ -119,7 +119,7 @@ pub struct Mixers {
 
 impl Mixers {
     pub fn mixer_create(&mut self, config: mixer::Config) -> Result<(), Error> {
-        let re = Regex::new(r"^[a-zA-Z0-9-]+$").unwrap();
+        let re = Regex::new(r"^[a-zA-Z0-9-_]+$").unwrap();
         if !re.is_match(config.name.as_str()) {
             return Err(Error::InvalidName);
         }
@@ -172,6 +172,7 @@ impl Mixers {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mixer;
     use warp::http::StatusCode;
     use warp::test::request;
 
@@ -188,10 +189,11 @@ mod tests {
         let resp = request()
             .method("POST")
             .path("/mixers")
-            .json(&Mixer {
-                name: "test".to_string(),
-                input_count: 0,
-                output_count: 0,
+            .json(&MixerCreateRequest {
+                name: "test_mixer_create".to_string(),
+                framerate: None,
+                width: None,
+                height: None,
             })
             .reply(&api)
             .await;
@@ -203,7 +205,11 @@ mod tests {
     #[tokio::test]
     async fn test_mixer_list() {
         let mut server = setup_server();
-        server.mixer_create("test").expect("failed to create mixer");
+        let config = mixer::Config {
+            name: "test_mixer_list".to_string(),
+            ..mixer::default_config()
+        };
+        server.mixer_create(config).expect("failed to create mixer");
         let api = filters::mixer_list(server.mixers.clone());
 
         let resp = request().method("GET").path("/mixers").reply(&api).await;
@@ -215,12 +221,16 @@ mod tests {
     #[tokio::test]
     async fn test_mixer_get() {
         let mut server = setup_server();
-        server.mixer_create("test").expect("failed to create mixer");
+        let config = mixer::Config {
+            name: "test_mixer_get".to_string(),
+            ..mixer::default_config()
+        };
+        server.mixer_create(config).expect("failed to create mixer");
         let api = filters::mixer_get(server.mixers.clone());
 
         let resp = request()
             .method("GET")
-            .path("/mixers/test")
+            .path("/mixers/test_mixer_get")
             .reply(&api)
             .await;
 
@@ -231,12 +241,16 @@ mod tests {
     #[tokio::test]
     async fn test_mixer_debug() {
         let mut server = setup_server();
-        server.mixer_create("test").expect("failed to create mixer");
+        let config = mixer::Config {
+            name: "test_mixer_debug".to_string(),
+            ..mixer::default_config()
+        };
+        server.mixer_create(config).expect("failed to create mixer");
         let api = filters::mixer_debug(server.mixers.clone());
 
         let resp = request()
             .method("GET")
-            .path("/mixers/test/debug")
+            .path("/mixers/test_mixer_debug/debug")
             .reply(&api)
             .await;
 
@@ -247,12 +261,16 @@ mod tests {
     #[tokio::test]
     async fn test_input_list() {
         let mut server = setup_server();
-        server.mixer_create("test").expect("failed to create mixer");
+        let config = mixer::Config {
+            name: "test_input_list".to_string(),
+            ..mixer::default_config()
+        };
+        server.mixer_create(config).expect("failed to create mixer");
         let api = filters::input_list(server.mixers.clone());
 
         let resp = request()
             .method("GET")
-            .path("/mixers/test/inputs")
+            .path("/mixers/test_input_list/inputs")
             .reply(&api)
             .await;
 
@@ -263,13 +281,17 @@ mod tests {
     #[tokio::test]
     async fn test_input_add() {
         let mut server = setup_server();
-        server.mixer_create("test").expect("failed to create mixer");
+        let config = mixer::Config {
+            name: "test_input_add".to_string(),
+            ..mixer::default_config()
+        };
+        server.mixer_create(config).expect("failed to create mixer");
         let api = filters::input_add(server.mixers.clone());
 
         let resp = request()
             .method("POST")
-            .path("/mixers/test/inputs")
-            .json(&super::Input {
+            .path("/mixers/test_input_add/inputs")
+            .json(&super::InputCreateRequest {
                 name: "test".to_string(),
                 input_type: "URI".to_string(),
                 location: "http://nowhere".to_string(),
@@ -285,7 +307,7 @@ mod tests {
                 .lock()
                 .unwrap()
                 .mixers
-                .get("test")
+                .get("test_input_add")
                 .unwrap()
                 .inputs
                 .len()
@@ -294,11 +316,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_input_get() {
-        let mixer_name = "test";
+        let mixer_name = "test_input_get";
         let mut server = setup_server();
-        server
-            .mixer_create(mixer_name)
-            .expect("failed to create mixer");
+        let config = mixer::Config {
+            name: mixer_name.to_string(),
+            ..mixer::default_config()
+        };
+        server.mixer_create(config).expect("failed to create mixer");
         server
             .input_add(
                 mixer_name,
@@ -310,7 +334,7 @@ mod tests {
 
         let resp = request()
             .method("GET")
-            .path("/mixers/test/inputs/fakesrc")
+            .path("/mixers/test_input_get/inputs/fakesrc")
             .reply(&api)
             .await;
 
@@ -320,11 +344,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_input_remove() {
-        let mixer_name = "test";
+        let mixer_name = "test_input_remove";
         let mut server = setup_server();
-        server
-            .mixer_create(mixer_name)
-            .expect("failed to create mixer");
+        let config = mixer::Config {
+            name: mixer_name.to_string(),
+            ..mixer::default_config()
+        };
+        server.mixer_create(config).expect("failed to create mixer");
         server
             .input_add(
                 mixer_name,
@@ -336,7 +362,7 @@ mod tests {
 
         let resp = request()
             .method("DELETE")
-            .path("/mixers/test/inputs/fakesrc")
+            .path("/mixers/test_input_remove/inputs/fakesrc")
             .reply(&api)
             .await;
 
@@ -348,7 +374,7 @@ mod tests {
                 .lock()
                 .unwrap()
                 .mixers
-                .get("test")
+                .get(mixer_name)
                 .unwrap()
                 .inputs
                 .len()
@@ -358,12 +384,16 @@ mod tests {
     #[tokio::test]
     async fn test_output_list() {
         let mut server = setup_server();
-        server.mixer_create("test").expect("failed to create mixer");
+        let config = mixer::Config {
+            name: "test_output_list".to_string(),
+            ..mixer::default_config()
+        };
+        server.mixer_create(config).expect("failed to create mixer");
         let api = filters::output_list(server.mixers.clone());
 
         let resp = request()
             .method("GET")
-            .path("/mixers/test/outputs")
+            .path("/mixers/test_output_list/outputs")
             .reply(&api)
             .await;
 
@@ -374,13 +404,17 @@ mod tests {
     #[tokio::test]
     async fn test_output_add() {
         let mut server = setup_server();
-        server.mixer_create("test").expect("failed to create mixer");
+        let config = mixer::Config {
+            name: "test_output_add".to_string(),
+            ..mixer::default_config()
+        };
+        server.mixer_create(config).expect("failed to create mixer");
         let api = filters::output_add(server.mixers.clone());
 
         let resp = request()
             .method("POST")
-            .path("/mixers/test/outputs")
-            .json(&super::Output {
+            .path("/mixers/test_output_add/outputs")
+            .json(&super::OutputCreateRequest {
                 name: "test".to_string(),
                 output_type: "Fake".to_string(),
                 location: "http://nowhere".to_string(),
@@ -396,7 +430,7 @@ mod tests {
                 .lock()
                 .unwrap()
                 .mixers
-                .get("test")
+                .get("test_output_add")
                 .unwrap()
                 .outputs
                 .len()
@@ -405,11 +439,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_output_get() {
-        let mixer_name = "test";
+        let mixer_name = "test_output_get";
         let mut server = setup_server();
-        server
-            .mixer_create(mixer_name)
-            .expect("failed to create mixer");
+        let config = mixer::Config {
+            name: mixer_name.to_string(),
+            ..mixer::default_config()
+        };
+        server.mixer_create(config).expect("failed to create mixer");
         server
             .output_add(
                 mixer_name,
@@ -421,7 +457,7 @@ mod tests {
 
         let resp = request()
             .method("GET")
-            .path("/mixers/test/outputs/fake")
+            .path("/mixers/test_output_get/outputs/fake")
             .reply(&api)
             .await;
 
@@ -431,11 +467,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_output_remove() {
-        let mixer_name = "test";
+        let mixer_name = "test_output_remove";
         let mut server = setup_server();
-        server
-            .mixer_create(mixer_name)
-            .expect("failed to create mixer");
+        let config = mixer::Config {
+            name: mixer_name.to_string(),
+            ..mixer::default_config()
+        };
+        server.mixer_create(config).expect("failed to create mixer");
         server
             .output_add(
                 mixer_name,
@@ -447,7 +485,7 @@ mod tests {
 
         let resp = request()
             .method("DELETE")
-            .path("/mixers/test/outputs/fake")
+            .path("/mixers/test_output_remove/outputs/fake")
             .reply(&api)
             .await;
 
@@ -459,7 +497,7 @@ mod tests {
                 .lock()
                 .unwrap()
                 .mixers
-                .get("test")
+                .get(mixer_name)
                 .unwrap()
                 .outputs
                 .len()

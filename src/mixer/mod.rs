@@ -29,16 +29,13 @@ pub struct Mixer {
     join_handle: Option<std::thread::JoinHandle<()>>,
 }
 
-impl Mixer {
-    pub fn default_config() -> Config {
-        Config {
-            name: "".to_string(),
-            framerate: Some(30),
-            width: Some(1920),
-            height: Some(1080),
-        }
+impl Drop for Mixer {
+    fn drop(&mut self) {
+        let _ = self.stop();
     }
+}
 
+impl Mixer {
     pub fn new(config: Config) -> Result<Self> {
         let background_enabled = true;
         let pipeline = gst::Pipeline::new(Some(config.name.as_str()));
@@ -268,5 +265,14 @@ fn watch_bus(pipeline: gst::Pipeline) {
             MessageView::Eos(..) => break,
             _ => (),
         }
+    }
+}
+
+pub fn default_config() -> Config {
+    Config {
+        name: "".to_string(),
+        framerate: Some(30),
+        width: Some(1920),
+        height: Some(1080),
     }
 }
