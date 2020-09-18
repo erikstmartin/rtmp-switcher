@@ -57,6 +57,14 @@ impl Input {
             Input::Fake(input) => input.unlink(),
         }
     }
+
+    pub fn set_state(&mut self, state: gst::State) -> Result<()> {
+        match self {
+            Input::URI(input) => input.set_state(state),
+            Input::Test(input) => input.set_state(state),
+            Input::Fake(input) => input.set_state(state),
+        }
+    }
 }
 
 pub struct URI {
@@ -202,6 +210,16 @@ impl URI {
 
         Ok(())
     }
+
+    pub fn set_state(&mut self, state: gst::State) -> Result<()> {
+        self.source.set_state(state)?;
+        self.audioconvert.set_state(state)?;
+        self.audioresample.set_state(state)?;
+        self.audioqueue.set_state(state)?;
+        self.videoconvert.set_state(state)?;
+        self.videoqueue.set_state(state)?;
+        Ok(())
+    }
 }
 
 pub struct Test {
@@ -258,6 +276,12 @@ impl Test {
             .remove_many(&[&self.audio, &self.video])?;
         Ok(())
     }
+
+    pub fn set_state(&mut self, state: gst::State) -> Result<()> {
+        self.audio.set_state(state)?;
+        self.video.set_state(state)?;
+        Ok(())
+    }
 }
 
 pub struct Fake {
@@ -301,7 +325,6 @@ impl Fake {
 
         gst::Element::link_many(&[&self.audio, &audio])?;
         gst::Element::link_many(&[&self.video, &video])?;
-
         Ok(())
     }
 
@@ -310,6 +333,12 @@ impl Fake {
             .as_ref()
             .unwrap()
             .remove_many(&[&self.audio, &self.video])?;
+        Ok(())
+    }
+
+    pub fn set_state(&mut self, state: gst::State) -> Result<()> {
+        self.audio.set_state(state)?;
+        self.video.set_state(state)?;
         Ok(())
     }
 }

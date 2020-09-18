@@ -53,6 +53,14 @@ impl Output {
             Output::Fake(output) => output.unlink(),
         }
     }
+
+    pub fn set_state(&mut self, state: gst::State) -> Result<()> {
+        match self {
+            Output::RTMP(output) => output.set_state(state),
+            Output::Auto(output) => output.set_state(state),
+            Output::Fake(output) => output.set_state(state),
+        }
+    }
 }
 
 pub struct Auto {
@@ -138,6 +146,7 @@ impl Auto {
             &self.videosink_queue,
             &self.videosink,
         ])?;
+
         self.pipeline = Some(pipeline);
 
         gst::Element::link_many(&[&audio, &self.audioqueue, &self.audiosink])?;
@@ -168,6 +177,19 @@ impl Auto {
             &self.videosink,
         ])?;
 
+        Ok(())
+    }
+
+    pub fn set_state(&mut self, state: gst::State) -> Result<()> {
+        self.videoqueue.set_state(state)?;
+        self.video_convert.set_state(state)?;
+        self.video_scale.set_state(state)?;
+        self.video_rate.set_state(state)?;
+        self.video_capsfilter.set_state(state)?;
+        self.videosink_queue.set_state(state)?;
+        self.videosink.set_state(state)?;
+        self.audioqueue.set_state(state)?;
+        self.audiosink.set_state(state)?;
         Ok(())
     }
 }
@@ -361,6 +383,27 @@ impl RTMP {
 
         Ok(())
     }
+
+    pub fn set_state(&mut self, state: gst::State) -> Result<()> {
+        self.video_queue.set_state(state)?;
+        self.video_convert.set_state(state)?;
+        self.video_scale.set_state(state)?;
+        self.video_rate.set_state(state)?;
+        self.video_capsfilter.set_state(state)?;
+        self.x264enc.set_state(state)?;
+        self.h264parse.set_state(state)?;
+        self.flvqueue.set_state(state)?;
+        self.flvmux.set_state(state)?;
+        self.queue_sink.set_state(state)?;
+        self.video_sink.set_state(state)?;
+
+        self.audio_queue.set_state(state)?;
+        self.audio_convert.set_state(state)?;
+        self.audio_resample.set_state(state)?;
+        self.audioenc.set_state(state)?;
+        self.aacparse.set_state(state)?;
+        Ok(())
+    }
 }
 
 pub struct Fake {
@@ -411,6 +454,12 @@ impl Fake {
             .as_ref()
             .unwrap()
             .remove_many(&[&self.audio, &self.video])?;
+        Ok(())
+    }
+
+    pub fn set_state(&mut self, state: gst::State) -> Result<()> {
+        self.audio.set_state(state)?;
+        self.video.set_state(state)?;
         Ok(())
     }
 }

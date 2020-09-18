@@ -17,7 +17,6 @@ use std::collections::HashMap;
 // - Handle dynamically changing pipeline while running
 //   - Use Idle PadProbe's in order to ensure we don't unlink elements during negotiations, etc.
 //   - Block src pads until ready.
-//   - Synchronize state between bins/elements before linking.
 // - Figure out why some input videos work and others fail (mismatch between sample rate of audio)
 // - Better comments
 // - Tests (eeeeek!)
@@ -96,6 +95,7 @@ impl Mixer {
                 &audio_resample,
                 &audio_queue,
             ])?;
+
             // Link video elements
             gst::Element::link_many(&[
                 &video_background,
@@ -103,6 +103,7 @@ impl Mixer {
                 &video_scale,
                 &video_mixer,
             ])?;
+
             // Link audio elements
             gst::Element::link_many(&[
                 &audio_background,
@@ -135,6 +136,9 @@ impl Mixer {
             return Err(Error::Exists("input".to_string(), input.name()));
         }
 
+        // TODO: Handle pending states
+        let state = self.pipeline.get_state(gst::ClockTime::from_seconds(15)).1;
+        input.set_state(state)?;
         input.link(
             self.pipeline.clone(),
             self.audio_mixer.clone(),
@@ -148,7 +152,7 @@ impl Mixer {
 
     // traverse pads->peers until we hit audio or video mixer.
     // Don't remove mixer element
-    // release pad from mixer
+    // TODO: release pad from mixer
     pub fn input_remove(&mut self, name: &str) -> Result<()> {
         if !self.inputs.contains_key(name) {
             return Err(Error::NotFound("input".to_string(), name.to_string()));
@@ -170,6 +174,9 @@ impl Mixer {
             return Err(Error::Exists("output".to_string(), output.name()));
         }
 
+        // TODO: Handle pending states
+        let state = self.pipeline.get_state(gst::ClockTime::from_seconds(15)).1;
+        output.set_state(state)?;
         output.link(
             self.pipeline.clone(),
             self.audio_out.clone(),
