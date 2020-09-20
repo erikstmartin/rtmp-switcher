@@ -7,15 +7,28 @@ pub use error::Error;
 use gst::prelude::*;
 pub use input::Input;
 pub use output::Output;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::mpsc;
 
-#[derive(Clone)]
-pub struct Config {
-    pub name: String,
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct VideoConfig {
     pub framerate: Option<i32>,
+    pub format: Option<String>,
     pub width: Option<i32>,
     pub height: Option<i32>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct AudioConfig {
+    pub volume: Option<f32>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct Config {
+    pub name: String,
+    pub video: VideoConfig,
+    pub audio: AudioConfig,
 }
 
 pub struct Mixer {
@@ -48,10 +61,11 @@ impl Mixer {
         let video_caps = gst::Caps::builder("video/x-raw")
             .field(
                 "framerate",
-                &gst::Fraction::new(config.framerate.unwrap(), 1),
+                &gst::Fraction::new(config.video.framerate.unwrap(), 1),
             )
-            .field("width", &config.width.unwrap())
-            .field("height", &config.height.unwrap())
+            .field("format", &config.video.format.clone().unwrap().as_str())
+            .field("width", &config.video.width.unwrap())
+            .field("height", &config.video.height.unwrap())
             .build();
         video_capsfilter.set_property("caps", &video_caps).unwrap();
 
@@ -68,6 +82,7 @@ impl Mixer {
             .field("channels", &2)
             .field("layout", &"interleaved")
             .field("format", &"S32LE")
+            .field("volume", &config.audio.volume.unwrap())
             .build();
         audio_capsfilter.set_property("caps", &audio_caps).unwrap();
 
@@ -88,10 +103,11 @@ impl Mixer {
             let video_caps = gst::Caps::builder("video/x-raw")
                 .field(
                     "framerate",
-                    &gst::Fraction::new(config.framerate.unwrap(), 1),
+                    &gst::Fraction::new(config.video.framerate.unwrap(), 1),
                 )
-                .field("width", &config.width.unwrap())
-                .field("height", &config.height.unwrap())
+                .field("width", &config.video.width.unwrap())
+                .field("height", &config.video.height.unwrap())
+                .field("format", &config.video.format.clone().unwrap().as_str())
                 .build();
             videotestsrc_capsfilter
                 .set_property("caps", &video_caps)
@@ -302,8 +318,20 @@ fn watch_bus(pipeline: gst::Pipeline, rx: mpsc::Receiver<()>) {
 pub fn default_config() -> Config {
     Config {
         name: "".to_string(),
+        audio: default_audio_config(),
+        video: default_video_config(),
+    }
+}
+
+pub fn default_audio_config() -> AudioConfig {
+    AudioConfig { volume: Some(1.0) }
+}
+
+pub fn default_video_config() -> VideoConfig {
+    VideoConfig {
         framerate: Some(30),
         width: Some(1920),
         height: Some(1080),
+        format: Some("RGBA".to_string()),
     }
 }

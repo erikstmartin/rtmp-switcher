@@ -30,9 +30,8 @@ pub enum Error {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct MixerCreateRequest {
     pub name: String,
-    pub framerate: Option<i32>,
-    pub width: Option<i32>,
-    pub height: Option<i32>,
+    pub video: mixer::VideoConfig,
+    pub audio: mixer::AudioConfig,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -191,9 +190,8 @@ mod tests {
             .path("/mixers")
             .json(&MixerCreateRequest {
                 name: "test_mixer_create".to_string(),
-                framerate: Some(30),
-                width: Some(1940),
-                height: Some(1080),
+                video: mixer::default_video_config(),
+                audio: mixer::default_audio_config(),
             })
             .reply(&api)
             .await;
