@@ -30,8 +30,8 @@ pub enum Error {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct MixerCreateRequest {
     pub name: String,
-    pub video: mixer::VideoConfig,
-    pub audio: mixer::AudioConfig,
+    pub video: Option<mixer::VideoConfig>,
+    pub audio: Option<mixer::AudioConfig>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

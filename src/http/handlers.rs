@@ -11,8 +11,8 @@ pub async fn mixer_create(
 ) -> Result<impl warp::Reply, Infallible> {
     let config = mixer::Config {
         name: mixer.name,
-        video: mixer.video,
-        audio: mixer.audio,
+        video: mixer.video.unwrap_or(mixer::default_video_config()),
+        audio: mixer.audio.unwrap_or(mixer::default_audio_config()),
     };
 
     match mixers.lock().unwrap().mixer_create(config) {
