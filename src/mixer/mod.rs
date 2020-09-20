@@ -46,7 +46,12 @@ impl Mixer {
         let video_capsfilter = gst::ElementFactory::make("capsfilter", Some("video_capsfilter"))?;
         let video_mixer = gst::ElementFactory::make("compositor", Some("videomixer"))?;
         let video_caps = gst::Caps::builder("video/x-raw")
-            .field("framerate", &gst::Fraction::new(30, 1))
+            .field(
+                "framerate",
+                &gst::Fraction::new(config.framerate.unwrap(), 1),
+            )
+            .field("width", &config.width.unwrap())
+            .field("height", &config.height.unwrap())
             .build();
         video_capsfilter.set_property("caps", &video_caps).unwrap();
 
@@ -78,6 +83,19 @@ impl Mixer {
             video_background.set_property("is-live", &true)?;
             let video_convert = gst::ElementFactory::make("videoconvert", Some("videoconvert"))?;
             let video_scale = gst::ElementFactory::make("videoscale", Some("videoscale"))?;
+            let videotestsrc_capsfilter =
+                gst::ElementFactory::make("capsfilter", Some("videotestsrc_capsfilter"))?;
+            let video_caps = gst::Caps::builder("video/x-raw")
+                .field(
+                    "framerate",
+                    &gst::Fraction::new(config.framerate.unwrap(), 1),
+                )
+                .field("width", &config.width.unwrap())
+                .field("height", &config.height.unwrap())
+                .build();
+            videotestsrc_capsfilter
+                .set_property("caps", &video_caps)
+                .unwrap();
 
             let audio_background = gst::ElementFactory::make("audiotestsrc", Some("audiotestsrc"))?;
             audio_background.set_property("volume", &0.0)?;
@@ -90,6 +108,7 @@ impl Mixer {
                 &video_background,
                 &video_convert,
                 &video_scale,
+                &videotestsrc_capsfilter,
                 &audio_background,
                 &audio_convert,
                 &audio_resample,
@@ -101,6 +120,7 @@ impl Mixer {
                 &video_background,
                 &video_convert,
                 &video_scale,
+                &videotestsrc_capsfilter,
                 &video_mixer,
             ])?;
 

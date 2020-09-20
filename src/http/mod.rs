@@ -191,9 +191,9 @@ mod tests {
             .path("/mixers")
             .json(&MixerCreateRequest {
                 name: "test_mixer_create".to_string(),
-                framerate: None,
-                width: None,
-                height: None,
+                framerate: Some(30),
+                width: Some(1940),
+                height: Some(1080),
             })
             .reply(&api)
             .await;
