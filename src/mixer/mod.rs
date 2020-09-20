@@ -8,6 +8,7 @@ use gst::prelude::*;
 pub use input::Input;
 pub use output::Output;
 use std::collections::HashMap;
+use std::sync::mpsc;
 
 #[derive(Clone)]
 pub struct Config {
@@ -26,6 +27,7 @@ pub struct Mixer {
     pub outputs: HashMap<String, Output>,
     audio_out: gst::Element,
     video_out: gst::Element,
+    tx: Option<mpsc::Sender<()>>,
     join_handle: Option<std::thread::JoinHandle<()>>,
 }
 
@@ -116,6 +118,7 @@ impl Mixer {
             config,
             pipeline,
             join_handle: None,
+            tx: None,
             audio_mixer,
             video_mixer,
             inputs: HashMap::new(),
@@ -199,7 +202,9 @@ impl Mixer {
 
     pub fn play(&mut self) -> Result<()> {
         let p = self.pipeline.clone();
-        self.join_handle = Some(std::thread::spawn(move || watch_bus(p)));
+        let (tx, rx) = mpsc::channel();
+        self.join_handle = Some(std::thread::spawn(move || watch_bus(p, rx)));
+        self.tx = Some(tx);
 
         self.pipeline.set_state(gst::State::Playing)?;
         Ok(())
@@ -207,6 +212,7 @@ impl Mixer {
 
     pub fn stop(&mut self) -> Result<()> {
         self.pipeline.set_state(gst::State::Null)?;
+        self.tx.take().unwrap().send(()).unwrap();
         self.join_handle.take().unwrap().join().unwrap();
 
         Ok(())
@@ -223,47 +229,52 @@ impl Mixer {
     }
 }
 
-fn watch_bus(pipeline: gst::Pipeline) {
+fn watch_bus(pipeline: gst::Pipeline, rx: mpsc::Receiver<()>) {
     // Wait until error or EOS
     let bus = pipeline.get_bus().unwrap();
-    for msg in bus.iter_timed(gst::CLOCK_TIME_NONE) {
-        use gst::MessageView;
-        match msg.view() {
-            MessageView::Error(err) => {
-                eprintln!(
-                    "{}: Error received from element {:?} {}",
-                    pipeline.get_name(),
-                    err.get_src().map(|s| s.get_path_string()),
-                    err.get_error()
-                );
-                eprintln!(
-                    "{}: Debugging information: {:?}",
-                    pipeline.get_name(),
-                    err.get_debug()
-                );
-                break;
-            }
-            MessageView::StateChanged(state_changed) => {
-                if state_changed
-                    .get_src()
-                    .map(|s| s == pipeline)
-                    .unwrap_or(false)
-                {
-                    println!(
-                        "{}: Pipeline state changed from {:?} to {:?}",
+    loop {
+        if let Ok(_) = rx.try_recv() {
+            break;
+        }
+        if let Some(msg) = bus.peek() {
+            use gst::MessageView;
+            match msg.view() {
+                MessageView::Error(err) => {
+                    eprintln!(
+                        "{}: Error received from element {:?} {}",
                         pipeline.get_name(),
-                        state_changed.get_old(),
-                        state_changed.get_current()
+                        err.get_src().map(|s| s.get_path_string()),
+                        err.get_error()
                     );
+                    eprintln!(
+                        "{}: Debugging information: {:?}",
+                        pipeline.get_name(),
+                        err.get_debug()
+                    );
+                    break;
+                }
+                MessageView::StateChanged(state_changed) => {
+                    if state_changed
+                        .get_src()
+                        .map(|s| s == pipeline)
+                        .unwrap_or(false)
+                    {
+                        println!(
+                            "{}: Pipeline state changed from {:?} to {:?}",
+                            pipeline.get_name(),
+                            state_changed.get_old(),
+                            state_changed.get_current()
+                        );
 
-                    match state_changed.get_current() {
-                        gst::State::Null => break,
-                        _ => continue,
+                        match state_changed.get_current() {
+                            gst::State::Null => break,
+                            _ => continue,
+                        }
                     }
                 }
+                MessageView::Eos(..) => break,
+                _ => (),
             }
-            MessageView::Eos(..) => break,
-            _ => (),
         }
     }
 }
