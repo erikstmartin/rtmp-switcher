@@ -244,7 +244,10 @@ impl Mixer {
 
     pub fn stop(&mut self) -> Result<()> {
         self.pipeline.set_state(gst::State::Null)?;
-        self.join_handle.take().unwrap().join().unwrap();
+
+        if self.join_handle.is_some() {
+            self.join_handle.take().unwrap().join().unwrap();
+        }
 
         Ok(())
     }
