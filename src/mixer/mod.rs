@@ -21,7 +21,7 @@ pub struct VideoConfig {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct AudioConfig {
-    pub volume: Option<f32>,
+    pub volume: Option<f64>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -77,20 +77,21 @@ impl Mixer {
         gst::Element::link_many(&[&video_mixer, &video_capsfilter, &video_queue, &video_tee])?;
 
         let audio_mixer = gst::ElementFactory::make("audiomixer", Some("audiomixer"))?;
+        let volume = gst::ElementFactory::make("volume", Some("audio_volume"))?;
+        volume.set_property("volume", &config.audio.volume.unwrap())?;
         let audio_capsfilter = gst::ElementFactory::make("capsfilter", Some("audio_capsfilter"))?;
         let audio_caps = gst::Caps::builder("audio/x-raw")
             .field("channels", &2)
             .field("layout", &"interleaved")
             .field("format", &"S32LE")
-            .field("volume", &config.audio.volume.unwrap())
             .build();
         audio_capsfilter.set_property("caps", &audio_caps).unwrap();
 
         let audio_tee = gst::ElementFactory::make("tee", Some("audiotee"))?;
         audio_tee.set_property("allow-not-linked", &true)?;
 
-        pipeline.add_many(&[&audio_mixer, &audio_capsfilter, &audio_tee])?;
-        gst::Element::link_many(&[&audio_mixer, &audio_capsfilter, &audio_tee])?;
+        pipeline.add_many(&[&audio_mixer, &volume, &audio_capsfilter, &audio_tee])?;
+        gst::Element::link_many(&[&audio_mixer, &volume, &audio_capsfilter, &audio_tee])?;
 
         if background_enabled {
             let video_background = gst::ElementFactory::make("videotestsrc", Some("videotestsrc"))?;
