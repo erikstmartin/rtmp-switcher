@@ -1,9 +1,18 @@
+use crate::http;
 use crate::mixer;
+use serde::Serialize;
 use std::convert::Infallible;
 use std::io::Write;
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use warp::http::StatusCode;
+use warp::reply::Reply;
+use warp::Filter;
+
+#[derive(Debug, Serialize)]
+pub struct Response {
+    pub message: String,
+}
 
 pub async fn mixer_create(
     mixer: super::MixerCreateRequest,
@@ -16,8 +25,26 @@ pub async fn mixer_create(
     };
 
     match mixers.lock().unwrap().mixer_create(config) {
-        Ok(_) => Ok(StatusCode::CREATED),
-        Err(_) => Ok(StatusCode::INTERNAL_SERVER_ERROR),
+        Ok(_) => Ok(warp::reply::with_status(
+            warp::reply::json(&Response {
+                message: "Mixer created".to_string(),
+            }),
+            StatusCode::CREATED,
+        )),
+        Err(e) => match e {
+            http::Error::Exists => Ok(warp::reply::with_status(
+                warp::reply::json(&Response {
+                    message: format!("{}", e),
+                }),
+                StatusCode::INTERNAL_SERVER_ERROR,
+            )),
+            e => Ok(warp::reply::with_status(
+                warp::reply::json(&Response {
+                    message: format!("{}", e),
+                }),
+                StatusCode::INTERNAL_SERVER_ERROR,
+            )),
+        },
     }
 }
 
@@ -26,24 +53,46 @@ pub async fn mixer_get(
     mixers: Arc<Mutex<super::Mixers>>,
 ) -> Result<impl warp::Reply, Infallible> {
     let mixers = mixers.lock().unwrap();
-    let mixer = mixers.mixers.get(name.as_str()).unwrap();
-
-    let mixer = &super::MixerResponse {
-        name: mixer.name(),
-        input_count: mixer.input_count(),
-        output_count: mixer.output_count(),
-    };
-
-    Ok(warp::reply::json(mixer))
+    let mixer = mixers.mixers.get(name.as_str());
+    match mixer {
+        Some(m) => {
+            let mixer = &super::MixerResponse {
+                name: m.name(),
+                input_count: m.input_count(),
+                output_count: m.output_count(),
+            };
+            Ok(warp::reply::with_status(
+                warp::reply::json(&mixer),
+                StatusCode::OK,
+            ))
+        }
+        None => Ok(warp::reply::with_status(
+            warp::reply::json(&Response {
+                message: "Mixer not found".to_string(),
+            }),
+            StatusCode::NOT_FOUND,
+        )),
+    }
 }
 
 pub async fn mixer_debug(
     name: String,
     mixers: Arc<Mutex<super::Mixers>>,
-) -> Result<impl warp::Reply, Infallible> {
+) -> Result<warp::reply::Response, Infallible> {
     let mixers = mixers.lock().unwrap();
-    let mixer = mixers.mixers.get(name.as_str()).unwrap();
+    let mixer = mixers.mixers.get(name.as_str());
 
+    if mixer.is_none() {
+        let mut response = warp::reply::json(&Response {
+            message: "Mixer not found".to_string(),
+        })
+        .into_response();
+        *response.status_mut() = StatusCode::NOT_FOUND;
+
+        return Ok(response);
+    }
+
+    let mixer = mixer.unwrap();
     let mut cmd = Command::new("dot")
         .arg("-Tsvg")
         .stdin(Stdio::piped())
@@ -61,7 +110,8 @@ pub async fn mixer_debug(
         String::from_utf8(output.stdout).unwrap(),
         "Content-Type",
         "image/svg+xml",
-    ))
+    )
+    .into_response())
 }
 
 pub async fn mixer_list(mixers: Arc<Mutex<super::Mixers>>) -> Result<impl warp::Reply, Infallible> {
@@ -93,20 +143,46 @@ pub async fn input_add(
     };
 
     match mixers.lock().unwrap().input_add(&mixer, input.unwrap()) {
-        Ok(_) => Ok(StatusCode::CREATED),
-        Err(_) => Ok(StatusCode::INTERNAL_SERVER_ERROR),
+        Ok(_) => Ok(warp::reply::with_status(
+            warp::reply::json(&Response {
+                message: "Input created".to_string(),
+            }),
+            StatusCode::CREATED,
+        )),
+        Err(e) => match e {
+            http::Error::NotFound => Ok(warp::reply::with_status(
+                warp::reply::json(&Response {
+                    message: "Mixer not found".to_string(),
+                }),
+                StatusCode::NOT_FOUND,
+            )),
+            _ => Ok(warp::reply::with_status(
+                warp::reply::json(&Response {
+                    message: format!("{}", e),
+                }),
+                StatusCode::INTERNAL_SERVER_ERROR,
+            )),
+        },
     }
 }
 
 pub async fn input_list(
     mixer_name: String,
     mixers: Arc<Mutex<super::Mixers>>,
-) -> Result<impl warp::Reply, Infallible> {
-    let inputs: Vec<super::InputResponse> = mixers
-        .lock()
-        .unwrap()
-        .mixers
-        .get(&mixer_name)
+) -> Result<warp::reply::Response, Infallible> {
+    let mixers = mixers.lock().unwrap();
+    let mixer = mixers.mixers.get(&mixer_name);
+    if mixer.is_none() {
+        let mut response = warp::reply::json(&Response {
+            message: "Mixer not found".to_string(),
+        })
+        .into_response();
+        *response.status_mut() = StatusCode::NOT_FOUND;
+
+        return Ok(response);
+    }
+
+    let inputs: Vec<super::InputResponse> = mixer
         .unwrap()
         .inputs
         .iter()
@@ -116,27 +192,36 @@ pub async fn input_list(
             location: input.location(),
         })
         .collect();
-    Ok(warp::reply::json(&inputs))
+    Ok(warp::reply::json(&inputs).into_response())
 }
 
 pub async fn input_get(
     mixer_name: String,
     input_name: String,
     mixers: Arc<Mutex<super::Mixers>>,
-) -> Result<impl warp::Reply, Infallible> {
+) -> Result<warp::reply::Response, Infallible> {
     let mixers = mixers.lock().unwrap();
-    let input: Option<&mixer::Input> = mixers
-        .mixers
-        .get(&mixer_name)
-        .unwrap()
-        .inputs
-        .get(input_name.as_str());
+    let mixer = mixers.mixers.get(&mixer_name);
+    if mixer.is_none() {
+        let mut response = warp::reply::json(&Response {
+            message: "Mixer not found".to_string(),
+        })
+        .into_response();
+        *response.status_mut() = StatusCode::NOT_FOUND;
+
+        return Ok(response);
+    }
+
+    let input: Option<&mixer::Input> = mixer.unwrap().inputs.get(input_name.as_str());
 
     if input.is_none() {
-        return Ok(warp::reply::with_status(
-            warp::reply::json(&""),
-            StatusCode::NOT_FOUND,
-        ));
+        let mut response = warp::reply::json(&Response {
+            message: "Input not found".to_string(),
+        })
+        .into_response();
+        *response.status_mut() = StatusCode::NOT_FOUND;
+
+        return Ok(response);
     }
 
     let input = input.unwrap();
@@ -146,10 +231,10 @@ pub async fn input_get(
         location: input.location(),
     };
 
-    Ok(warp::reply::with_status(
-        warp::reply::json(&input),
-        StatusCode::OK,
-    ))
+    let mut response = warp::reply::json(&input).into_response();
+    *response.status_mut() = StatusCode::NOT_FOUND;
+
+    Ok(response)
 }
 
 pub async fn input_remove(
@@ -157,25 +242,58 @@ pub async fn input_remove(
     input_name: String,
     mixers: Arc<Mutex<super::Mixers>>,
 ) -> Result<impl warp::Reply, Infallible> {
-    match mixers
-        .lock()
-        .unwrap()
-        .input_remove(&mixer_name, &input_name)
-    {
-        Ok(_) => Ok(StatusCode::OK),
-        Err(_) => Ok(StatusCode::NOT_FOUND),
+    let mut mixers = mixers.lock().unwrap();
+    let mixer = mixers.mixers.get_mut(&mixer_name);
+    if mixer.is_none() {
+        return Ok(warp::reply::with_status(
+            warp::reply::json(&Response {
+                message: "Mixer not found".to_string(),
+            }),
+            StatusCode::NOT_FOUND,
+        ));
+    }
+
+    match mixer.unwrap().input_remove(&input_name) {
+        Ok(_) => Ok(warp::reply::with_status(
+            warp::reply::json(&Response {
+                message: "Mixer created".to_string(),
+            }),
+            StatusCode::CREATED,
+        )),
+        Err(e) => match e {
+            mixer::Error::NotFound(_, _) => Ok(warp::reply::with_status(
+                warp::reply::json(&Response {
+                    message: format!("{}", e),
+                }),
+                StatusCode::NOT_FOUND,
+            )),
+            e => Ok(warp::reply::with_status(
+                warp::reply::json(&Response {
+                    message: format!("{}", e),
+                }),
+                StatusCode::INTERNAL_SERVER_ERROR,
+            )),
+        },
     }
 }
 
 pub async fn output_list(
-    name: String,
+    mixer_name: String,
     mixers: Arc<Mutex<super::Mixers>>,
 ) -> Result<impl warp::Reply, Infallible> {
-    let outputs: Vec<super::OutputResponse> = mixers
-        .lock()
-        .unwrap()
-        .mixers
-        .get(&name)
+    let mixers = mixers.lock().unwrap();
+    let mixer = mixers.mixers.get(&mixer_name);
+    if mixer.is_none() {
+        let mut response = warp::reply::json(&Response {
+            message: "Mixer not found".to_string(),
+        })
+        .into_response();
+        *response.status_mut() = StatusCode::NOT_FOUND;
+
+        return Ok(response);
+    }
+
+    let outputs: Vec<super::OutputResponse> = mixer
         .unwrap()
         .outputs
         .iter()
@@ -185,7 +303,7 @@ pub async fn output_list(
             location: output.location(),
         })
         .collect();
-    Ok(warp::reply::json(&outputs))
+    Ok(warp::reply::json(&outputs).into_response())
 }
 
 pub async fn output_add(
@@ -202,8 +320,26 @@ pub async fn output_add(
     };
 
     match mixers.lock().unwrap().output_add(&mixer, output.unwrap()) {
-        Ok(_) => Ok(StatusCode::CREATED),
-        Err(_) => Ok(StatusCode::INTERNAL_SERVER_ERROR),
+        Ok(_) => Ok(warp::reply::with_status(
+            warp::reply::json(&Response {
+                message: "Output created".to_string(),
+            }),
+            StatusCode::CREATED,
+        )),
+        Err(e) => match e {
+            http::Error::NotFound => Ok(warp::reply::with_status(
+                warp::reply::json(&Response {
+                    message: "Mixer not found".to_string(),
+                }),
+                StatusCode::NOT_FOUND,
+            )),
+            _ => Ok(warp::reply::with_status(
+                warp::reply::json(&Response {
+                    message: format!("{}", e),
+                }),
+                StatusCode::INTERNAL_SERVER_ERROR,
+            )),
+        },
     }
 }
 
@@ -213,18 +349,27 @@ pub async fn output_get(
     mixers: Arc<Mutex<super::Mixers>>,
 ) -> Result<impl warp::Reply, Infallible> {
     let mixers = mixers.lock().unwrap();
-    let output: Option<&mixer::Output> = mixers
-        .mixers
-        .get(&mixer_name)
-        .unwrap()
-        .outputs
-        .get(output_name.as_str());
+    let mixer = mixers.mixers.get(&mixer_name);
+    if mixer.is_none() {
+        let mut response = warp::reply::json(&Response {
+            message: "Mixer not found".to_string(),
+        })
+        .into_response();
+        *response.status_mut() = StatusCode::NOT_FOUND;
+
+        return Ok(response);
+    }
+
+    let output: Option<&mixer::Output> = mixer.unwrap().outputs.get(output_name.as_str());
 
     if output.is_none() {
-        return Ok(warp::reply::with_status(
-            warp::reply::json(&""),
-            StatusCode::NOT_FOUND,
-        ));
+        let mut response = warp::reply::json(&Response {
+            message: "Output not found".to_string(),
+        })
+        .into_response();
+        *response.status_mut() = StatusCode::NOT_FOUND;
+
+        return Ok(response);
     }
 
     let output = output.unwrap();
@@ -234,10 +379,10 @@ pub async fn output_get(
         location: output.location(),
     };
 
-    Ok(warp::reply::with_status(
-        warp::reply::json(&output),
-        StatusCode::OK,
-    ))
+    let mut response = warp::reply::json(&output).into_response();
+    *response.status_mut() = StatusCode::NOT_FOUND;
+
+    Ok(response)
 }
 
 pub async fn output_remove(
@@ -245,12 +390,37 @@ pub async fn output_remove(
     output_name: String,
     mixers: Arc<Mutex<super::Mixers>>,
 ) -> Result<impl warp::Reply, Infallible> {
-    match mixers
-        .lock()
-        .unwrap()
-        .output_remove(&mixer_name, &output_name)
-    {
-        Ok(_) => Ok(StatusCode::OK),
-        Err(_) => Ok(StatusCode::NOT_FOUND),
+    let mut mixers = mixers.lock().unwrap();
+    let mixer = mixers.mixers.get_mut(&mixer_name);
+    if mixer.is_none() {
+        return Ok(warp::reply::with_status(
+            warp::reply::json(&Response {
+                message: "Mixer not found".to_string(),
+            }),
+            StatusCode::NOT_FOUND,
+        ));
+    }
+
+    match mixer.unwrap().output_remove(&output_name) {
+        Ok(_) => Ok(warp::reply::with_status(
+            warp::reply::json(&Response {
+                message: "Mixer created".to_string(),
+            }),
+            StatusCode::CREATED,
+        )),
+        Err(e) => match e {
+            mixer::Error::NotFound(_, _) => Ok(warp::reply::with_status(
+                warp::reply::json(&Response {
+                    message: format!("{}", e),
+                }),
+                StatusCode::NOT_FOUND,
+            )),
+            e => Ok(warp::reply::with_status(
+                warp::reply::json(&Response {
+                    message: format!("{}", e),
+                }),
+                StatusCode::INTERNAL_SERVER_ERROR,
+            )),
+        },
     }
 }
