@@ -207,7 +207,6 @@ pub struct RTMP {
     video_rate: gst::Element,
     video_capsfilter: gst::Element,
     x264enc: gst::Element,
-    h264parse: gst::Element,
     flvqueue: gst::Element,
     flvmux: gst::Element,
     queue_sink: gst::Element,
@@ -217,7 +216,6 @@ pub struct RTMP {
     audio_convert: gst::Element,
     audio_resample: gst::Element,
     audioenc: gst::Element,
-    aacparse: gst::Element,
 }
 
 impl RTMP {
@@ -246,8 +244,6 @@ impl RTMP {
             gst::ElementFactory::make("x264enc", Some(format!("{}_x264enc", name).as_str()))?;
         x264enc.set_property("key-int-max", &60u32)?;
 
-        let h264parse =
-            gst::ElementFactory::make("h264parse", Some(format!("{}_h264parse", name).as_str()))?;
         let flvqueue = gst::ElementFactory::make("queue", Some(format!("{}_flv", name).as_str()))?;
         let flvmux =
             gst::ElementFactory::make("flvmux", Some(format!("{}_flvmux", name).as_str()))?;
@@ -271,8 +267,6 @@ impl RTMP {
         )?;
         let audioenc =
             gst::ElementFactory::make("fdkaacenc", Some(format!("{}_fdkaacenc", name).as_str()))?;
-        let aacparse =
-            gst::ElementFactory::make("aacparse", Some(format!("{}_aacparse", name).as_str()))?;
 
         Ok(Output::RTMP(Self {
             name: name.to_string(),
@@ -284,7 +278,6 @@ impl RTMP {
             video_rate,
             video_capsfilter,
             x264enc,
-            h264parse,
             flvqueue,
             flvmux,
             queue_sink,
@@ -293,7 +286,6 @@ impl RTMP {
             audio_convert,
             audio_resample,
             audioenc,
-            aacparse,
         }))
     }
 
@@ -314,7 +306,6 @@ impl RTMP {
             &self.video_rate,
             &self.video_capsfilter,
             &self.x264enc,
-            &self.h264parse,
             &self.flvqueue,
             &self.flvmux,
             &self.queue_sink,
@@ -329,7 +320,6 @@ impl RTMP {
             &self.video_rate,
             &self.video_capsfilter,
             &self.x264enc,
-            &self.h264parse,
             &self.flvqueue,
             &self.flvmux,
             &self.queue_sink,
@@ -342,7 +332,6 @@ impl RTMP {
             &self.audio_convert,
             &self.audio_resample,
             &self.audioenc,
-            &self.aacparse,
         ])?;
 
         gst::Element::link_many(&[
@@ -351,7 +340,6 @@ impl RTMP {
             &self.audio_convert,
             &self.audio_resample,
             &self.audioenc,
-            &self.aacparse,
             &self.flvmux,
         ])?;
 
@@ -372,7 +360,6 @@ impl RTMP {
             &self.video_rate,
             &self.video_capsfilter,
             &self.x264enc,
-            &self.h264parse,
             &self.flvqueue,
             &self.flvmux,
             &self.queue_sink,
@@ -384,7 +371,6 @@ impl RTMP {
             &self.audio_convert,
             &self.audio_resample,
             &self.audioenc,
-            &self.aacparse,
         ])?;
 
         Ok(())
@@ -397,7 +383,6 @@ impl RTMP {
         self.video_rate.set_state(state)?;
         self.video_capsfilter.set_state(state)?;
         self.x264enc.set_state(state)?;
-        self.h264parse.set_state(state)?;
         self.flvqueue.set_state(state)?;
         self.flvmux.set_state(state)?;
         self.queue_sink.set_state(state)?;
@@ -407,7 +392,6 @@ impl RTMP {
         self.audio_convert.set_state(state)?;
         self.audio_resample.set_state(state)?;
         self.audioenc.set_state(state)?;
-        self.aacparse.set_state(state)?;
         Ok(())
     }
 }
