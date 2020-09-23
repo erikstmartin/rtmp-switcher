@@ -148,7 +148,6 @@ pub async fn input_add(
 
     let config = mixer::Config {
         name: input.name.clone(),
-        // TODO: Don't default to crate default, grab current mixer settings
         video: input.video.unwrap_or(mixer_config.video),
         audio: input.audio.unwrap_or(mixer_config.audio),
     };
@@ -157,7 +156,7 @@ pub async fn input_add(
         "URI" => crate::mixer::input::URI::new(config, &input.location)
             .map_err(|e| super::Error::Mixer(e)),
         "Fake" => crate::mixer::input::Fake::new(&input.name).map_err(|e| super::Error::Mixer(e)),
-        "Test" => crate::mixer::input::Test::new(&input.name).map_err(|e| super::Error::Mixer(e)),
+        "Test" => crate::mixer::input::Test::new(config).map_err(|e| super::Error::Mixer(e)),
         _ => Err(super::Error::Unknown),
     };
 

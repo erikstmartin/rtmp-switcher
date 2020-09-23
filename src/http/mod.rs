@@ -199,8 +199,8 @@ mod tests {
             .path("/mixers")
             .json(&MixerCreateRequest {
                 name: "test_mixer_create".to_string(),
-                video: mixer::default_video_config(),
-                audio: mixer::default_audio_config(),
+                video: Some(mixer::default_video_config()),
+                audio: Some(mixer::default_audio_config()),
             })
             .reply(&api)
             .await;
@@ -302,6 +302,8 @@ mod tests {
                 name: "test".to_string(),
                 input_type: "URI".to_string(),
                 location: "http://nowhere".to_string(),
+                video: Some(mixer::default_video_config()),
+                audio: Some(mixer::default_audio_config()),
             })
             .reply(&api)
             .await;

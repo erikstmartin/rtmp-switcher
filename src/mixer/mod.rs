@@ -91,69 +91,8 @@ impl Mixer {
         pipeline.add_many(&[&audio_mixer, &volume, &audio_capsfilter, &audio_tee])?;
         gst::Element::link_many(&[&audio_mixer, &volume, &audio_capsfilter, &audio_tee])?;
 
-        if background_enabled {
-            let video_background = gst::ElementFactory::make("videotestsrc", Some("videotestsrc"))?;
-            video_background.set_property_from_str("pattern", "black");
-            video_background.set_property("is-live", &true)?;
-            let video_convert = gst::ElementFactory::make("videoconvert", Some("videoconvert"))?;
-            let video_scale = gst::ElementFactory::make("videoscale", Some("videoscale"))?;
-            let video_rate = gst::ElementFactory::make("videorate", Some("videorate"))?;
-            let videotestsrc_capsfilter =
-                gst::ElementFactory::make("capsfilter", Some("videotestsrc_capsfilter"))?;
-            let video_caps = gst::Caps::builder("video/x-raw")
-                .field(
-                    "framerate",
-                    &gst::Fraction::new(config.video.framerate.unwrap(), 1),
-                )
-                .field("width", &config.video.width.unwrap())
-                .field("height", &config.video.height.unwrap())
-                .field("format", &config.video.format.clone().unwrap().as_str())
-                .build();
-            videotestsrc_capsfilter
-                .set_property("caps", &video_caps)
-                .unwrap();
-
-            let audio_background = gst::ElementFactory::make("audiotestsrc", Some("audiotestsrc"))?;
-            audio_background.set_property("volume", &0.0)?;
-            audio_background.set_property("is-live", &true)?;
-            let audio_convert = gst::ElementFactory::make("audioconvert", Some("audioconvert"))?;
-            let audio_resample = gst::ElementFactory::make("audioresample", Some("audioresample"))?;
-            let audio_queue = gst::ElementFactory::make("queue", Some("audiotestsrc_queue"))?;
-
-            pipeline.add_many(&[
-                &video_background,
-                &video_convert,
-                &video_scale,
-                &video_rate,
-                &videotestsrc_capsfilter,
-                &audio_background,
-                &audio_convert,
-                &audio_resample,
-                &audio_queue,
-            ])?;
-
-            // Link video elements
-            gst::Element::link_many(&[
-                &video_background,
-                &video_convert,
-                &video_scale,
-                &video_rate,
-                &videotestsrc_capsfilter,
-                &video_mixer,
-            ])?;
-
-            // Link audio elements
-            gst::Element::link_many(&[
-                &audio_background,
-                &audio_convert,
-                &audio_resample,
-                &audio_queue,
-                &audio_mixer,
-            ])?;
-        }
-
-        Ok(Mixer {
-            config,
+        let mut mixer = Mixer {
+            config: config.clone(),
             pipeline,
             join_handle: None,
             audio_mixer,
@@ -162,7 +101,19 @@ impl Mixer {
             outputs: HashMap::new(),
             audio_out: audio_tee,
             video_out: video_tee,
-        })
+        };
+
+        let config = Config {
+            name: "background".to_string(),
+            audio: AudioConfig { volume: Some(0.0) },
+            video: config.video.clone(),
+        };
+        let background = input::Test::new(config)?;
+        if background_enabled {
+            mixer.input_add(background)?;
+        }
+
+        Ok(mixer)
     }
 
     pub fn input_count(&self) -> usize {
