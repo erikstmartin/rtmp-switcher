@@ -97,6 +97,7 @@ impl Mixer {
             video_background.set_property("is-live", &true)?;
             let video_convert = gst::ElementFactory::make("videoconvert", Some("videoconvert"))?;
             let video_scale = gst::ElementFactory::make("videoscale", Some("videoscale"))?;
+            let video_rate = gst::ElementFactory::make("videorate", Some("videorate"))?;
             let videotestsrc_capsfilter =
                 gst::ElementFactory::make("capsfilter", Some("videotestsrc_capsfilter"))?;
             let video_caps = gst::Caps::builder("video/x-raw")
@@ -123,6 +124,7 @@ impl Mixer {
                 &video_background,
                 &video_convert,
                 &video_scale,
+                &video_rate,
                 &videotestsrc_capsfilter,
                 &audio_background,
                 &audio_convert,
@@ -135,6 +137,7 @@ impl Mixer {
                 &video_background,
                 &video_convert,
                 &video_scale,
+                &video_rate,
                 &videotestsrc_capsfilter,
                 &video_mixer,
             ])?;
@@ -260,6 +263,10 @@ impl Mixer {
 
     pub fn name(&self) -> String {
         self.config.name.clone()
+    }
+
+    pub fn config(&self) -> Config {
+        self.config.clone()
     }
 }
 

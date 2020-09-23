@@ -7,7 +7,6 @@ use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use warp::http::StatusCode;
 use warp::reply::Reply;
-use warp::Filter;
 
 #[derive(Debug, Serialize)]
 pub struct Response {
@@ -130,19 +129,39 @@ pub async fn mixer_list(mixers: Arc<Mutex<super::Mixers>>) -> Result<impl warp::
 }
 
 pub async fn input_add(
-    mixer: String,
+    mixer_name: String,
     input: super::InputCreateRequest,
     mixers: Arc<Mutex<super::Mixers>>,
 ) -> Result<impl warp::Reply, Infallible> {
+    let mut mixers = mixers.lock().unwrap();
+    let mixer_config = mixers.mixer_config(&mixer_name);
+
+    if mixer_config.is_err() {
+        return Ok(warp::reply::with_status(
+            warp::reply::json(&Response {
+                message: "Mixer not found".to_string(),
+            }),
+            StatusCode::NOT_FOUND,
+        ));
+    }
+    let mixer_config = mixer_config.unwrap();
+
+    let config = mixer::Config {
+        name: input.name.clone(),
+        // TODO: Don't default to crate default, grab current mixer settings
+        video: input.video.unwrap_or(mixer_config.video),
+        audio: input.audio.unwrap_or(mixer_config.audio),
+    };
+
     let input = match input.input_type.as_str() {
-        "URI" => crate::mixer::input::URI::new(&input.name, &input.location)
+        "URI" => crate::mixer::input::URI::new(config, &input.location)
             .map_err(|e| super::Error::Mixer(e)),
         "Fake" => crate::mixer::input::Fake::new(&input.name).map_err(|e| super::Error::Mixer(e)),
         "Test" => crate::mixer::input::Test::new(&input.name).map_err(|e| super::Error::Mixer(e)),
         _ => Err(super::Error::Unknown),
     };
 
-    match mixers.lock().unwrap().input_add(&mixer, input.unwrap()) {
+    match mixers.input_add(&mixer_name, input.unwrap()) {
         Ok(_) => Ok(warp::reply::with_status(
             warp::reply::json(&Response {
                 message: "Input created".to_string(),

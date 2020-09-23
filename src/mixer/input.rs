@@ -1,3 +1,4 @@
+use crate::mixer;
 use crate::Result;
 use gst::prelude::*;
 use gstreamer as gst;
@@ -9,8 +10,8 @@ pub enum Input {
 }
 
 impl Input {
-    pub fn from_uri(name: &str, uri: &str) -> Input {
-        URI::new(name, uri).unwrap()
+    pub fn from_uri(config: mixer::Config, uri: &str) -> Input {
+        URI::new(config, uri).unwrap()
     }
 
     pub fn name(&self) -> String {
@@ -74,13 +75,19 @@ pub struct URI {
     source: gst::Element,
     audioconvert: gst::Element,
     audioresample: gst::Element,
+    volume: gst::Element,
     audioqueue: gst::Element,
     videoconvert: gst::Element,
+    videoscale: gst::Element,
+    videorate: gst::Element,
+    video_capsfilter: gst::Element,
     videoqueue: gst::Element,
 }
 
 impl URI {
-    pub fn new(name: &str, uri: &str) -> Result<Input> {
+    pub fn new(config: mixer::Config, uri: &str) -> Result<Input> {
+        let name = config.name;
+
         let source =
             gst::ElementFactory::make("uridecodebin", Some(format!("{}_source", name).as_str()))?;
         source.set_property("uri", &uri)?;
@@ -89,6 +96,23 @@ impl URI {
             "videoconvert",
             Some(format!("{}_videoconvert", name).as_str()),
         )?;
+        let videoscale =
+            gst::ElementFactory::make("videoscale", Some(format!("{}_videoscale", name).as_str()))?;
+        let videorate =
+            gst::ElementFactory::make("videorate", Some(format!("{}_videorate", name).as_str()))?;
+        let video_caps = gst::Caps::builder("video/x-raw")
+            .field(
+                "framerate",
+                &gst::Fraction::new(config.video.framerate.unwrap(), 1),
+            )
+            .field("format", &config.video.format.clone().unwrap().as_str())
+            .field("width", &config.video.width.unwrap())
+            .field("height", &config.video.height.unwrap())
+            .build();
+        let video_capsfilter =
+            gst::ElementFactory::make("capsfilter", Some(format!("{}_capsfilter", name).as_str()))?;
+        video_capsfilter.set_property("caps", &video_caps).unwrap();
+
         let videoqueue =
             gst::ElementFactory::make("queue2", Some(format!("{}_videoqueue", name).as_str()))?;
 
@@ -102,6 +126,10 @@ impl URI {
         )?;
         let audioqueue =
             gst::ElementFactory::make("queue2", Some(format!("{}_audioqueue", name).as_str()))?;
+
+        let volume =
+            gst::ElementFactory::make("volume", Some(format!("{}_audio_volume", name).as_str()))?;
+        volume.set_property("volume", &config.audio.volume.unwrap())?;
 
         let audio = audioconvert.clone();
         let video = videoconvert.clone();
@@ -159,9 +187,13 @@ impl URI {
             pipeline: None,
             source,
             audioconvert,
+            volume,
             audioresample,
             audioqueue,
             videoconvert,
+            videoscale,
+            videorate,
+            video_capsfilter,
             videoqueue,
         }))
     }
@@ -179,9 +211,13 @@ impl URI {
         pipeline.add_many(&[
             &self.source,
             &self.audioconvert,
+            &self.volume,
             &self.audioresample,
             &self.audioqueue,
             &self.videoconvert,
+            &self.videoscale,
+            &self.videorate,
+            &self.video_capsfilter,
             &self.videoqueue,
         ])?;
 
@@ -189,11 +225,19 @@ impl URI {
 
         gst::Element::link_many(&[
             &self.audioconvert,
+            &self.volume,
             &self.audioresample,
             &self.audioqueue,
             &audio,
         ])?;
-        gst::Element::link_many(&[&self.videoconvert, &self.videoqueue, &video])?;
+        gst::Element::link_many(&[
+            &self.videoconvert,
+            &self.videoscale,
+            &self.videorate,
+            &self.video_capsfilter,
+            &self.videoqueue,
+            &video,
+        ])?;
 
         Ok(())
     }
@@ -205,9 +249,13 @@ impl URI {
         self.pipeline.as_ref().unwrap().remove_many(&[
             &self.source,
             &self.audioconvert,
+            &self.volume,
             &self.audioresample,
             &self.audioqueue,
             &self.videoconvert,
+            &self.videoscale,
+            &self.videorate,
+            &self.video_capsfilter,
             &self.videoqueue,
         ])?;
 
@@ -218,8 +266,12 @@ impl URI {
         self.source.set_state(state)?;
         self.audioconvert.set_state(state)?;
         self.audioresample.set_state(state)?;
+        self.volume.set_state(state)?;
         self.audioqueue.set_state(state)?;
         self.videoconvert.set_state(state)?;
+        self.videoscale.set_state(state)?;
+        self.videorate.set_state(state)?;
+        self.video_capsfilter.set_state(state)?;
         self.videoqueue.set_state(state)?;
         Ok(())
     }

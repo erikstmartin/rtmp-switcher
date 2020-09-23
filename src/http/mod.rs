@@ -46,6 +46,8 @@ pub struct InputCreateRequest {
     pub name: String,
     pub input_type: String,
     pub location: String,
+    pub audio: Option<mixer::AudioConfig>,
+    pub video: Option<mixer::VideoConfig>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -117,6 +119,13 @@ pub struct Mixers {
 }
 
 impl Mixers {
+    pub fn mixer_config(&self, name: &str) -> Result<mixer::Config, Error> {
+        match self.mixers.get(name) {
+            Some(m) => Ok(m.config()),
+            None => Err(Error::NotFound),
+        }
+    }
+
     pub fn mixer_create(&mut self, config: mixer::Config) -> Result<(), Error> {
         let re = Regex::new(r"^[a-zA-Z0-9-_]+$").unwrap();
         if !re.is_match(config.name.as_str()) {
