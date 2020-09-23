@@ -108,9 +108,13 @@ impl Mixer {
             audio: AudioConfig { volume: Some(0.0) },
             video: config.video.clone(),
         };
-        let background = input::Test::new(config)?;
+        let mut background = input::Test::new(config)?;
         if background_enabled {
-            mixer.input_add(background)?;
+            background.link(
+                mixer.pipeline.clone(),
+                mixer.audio_mixer.clone(),
+                mixer.video_mixer.clone(),
+            )?;
         }
 
         Ok(mixer)
@@ -199,9 +203,11 @@ impl Mixer {
     pub fn stop(&mut self) -> Result<()> {
         self.pipeline.set_state(gst::State::Null)?;
 
+        /* TODO: Fix me
         if self.join_handle.is_some() {
             self.join_handle.take().unwrap().join().unwrap();
         }
+        */
 
         Ok(())
     }

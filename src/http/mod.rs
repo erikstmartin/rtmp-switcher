@@ -6,8 +6,9 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use thiserror::Error;
+use tokio::sync::Mutex;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -96,21 +97,21 @@ impl Server {
     }
 
     pub async fn run(&self) {
-        warp::serve(filters::routes(self.mixers.clone()))
+        warp::serve(filters::routes(Arc::clone(&self.mixers)))
             .run(self.socket_addr)
             .await;
     }
 
-    pub fn mixer_create(&mut self, config: mixer::Config) -> Result<(), Error> {
-        self.mixers.lock().unwrap().mixer_create(config)
+    pub async fn mixer_create(&mut self, config: mixer::Config) -> Result<(), Error> {
+        self.mixers.lock().await.mixer_create(config)
     }
 
-    pub fn input_add(&mut self, mixer: &str, input: mixer::Input) -> Result<(), Error> {
-        self.mixers.lock().unwrap().input_add(mixer, input)
+    pub async fn input_add(&mut self, mixer: &str, input: mixer::Input) -> Result<(), Error> {
+        self.mixers.lock().await.input_add(mixer, input)
     }
 
-    pub fn output_add(&mut self, mixer: &str, output: mixer::Output) -> Result<(), Error> {
-        self.mixers.lock().unwrap().output_add(mixer, output)
+    pub async fn output_add(&mut self, mixer: &str, output: mixer::Output) -> Result<(), Error> {
+        self.mixers.lock().await.output_add(mixer, output)
     }
 }
 
@@ -192,7 +193,7 @@ mod tests {
     #[tokio::test]
     async fn test_mixer_create() {
         let server = setup_server();
-        let api = filters::mixer_create(server.mixers.clone());
+        let api = filters::mixer_create(Arc::clone(&server.mixers));
 
         let resp = request()
             .method("POST")
@@ -206,7 +207,7 @@ mod tests {
             .await;
 
         assert_eq!(resp.status(), StatusCode::CREATED);
-        assert_eq!(1, server.mixers.lock().unwrap().mixers.len());
+        assert_eq!(1, server.mixers.lock().await.mixers.len());
     }
 
     #[tokio::test]
@@ -216,8 +217,11 @@ mod tests {
             name: "test_mixer_list".to_string(),
             ..mixer::default_config()
         };
-        server.mixer_create(config).expect("failed to create mixer");
-        let api = filters::mixer_list(server.mixers.clone());
+        server
+            .mixer_create(config)
+            .await
+            .expect("failed to create mixer");
+        let api = filters::mixer_list(Arc::clone(&server.mixers));
 
         let resp = request().method("GET").path("/mixers").reply(&api).await;
 
@@ -232,8 +236,11 @@ mod tests {
             name: "test_mixer_get".to_string(),
             ..mixer::default_config()
         };
-        server.mixer_create(config).expect("failed to create mixer");
-        let api = filters::mixer_get(server.mixers.clone());
+        server
+            .mixer_create(config)
+            .await
+            .expect("failed to create mixer");
+        let api = filters::mixer_get(Arc::clone(&server.mixers));
 
         let resp = request()
             .method("GET")
@@ -252,8 +259,11 @@ mod tests {
             name: "test_mixer_debug".to_string(),
             ..mixer::default_config()
         };
-        server.mixer_create(config).expect("failed to create mixer");
-        let api = filters::mixer_debug(server.mixers.clone());
+        server
+            .mixer_create(config)
+            .await
+            .expect("failed to create mixer");
+        let api = filters::mixer_debug(Arc::clone(&server.mixers));
 
         let resp = request()
             .method("GET")
@@ -272,8 +282,11 @@ mod tests {
             name: "test_input_list".to_string(),
             ..mixer::default_config()
         };
-        server.mixer_create(config).expect("failed to create mixer");
-        let api = filters::input_list(server.mixers.clone());
+        server
+            .mixer_create(config)
+            .await
+            .expect("failed to create mixer");
+        let api = filters::input_list(Arc::clone(&server.mixers));
 
         let resp = request()
             .method("GET")
@@ -292,8 +305,11 @@ mod tests {
             name: "test_input_add".to_string(),
             ..mixer::default_config()
         };
-        server.mixer_create(config).expect("failed to create mixer");
-        let api = filters::input_add(server.mixers.clone());
+        server
+            .mixer_create(config)
+            .await
+            .expect("failed to create mixer");
+        let api = filters::input_add(Arc::clone(&server.mixers).clone());
 
         let resp = request()
             .method("POST")
@@ -314,7 +330,7 @@ mod tests {
             server
                 .mixers
                 .lock()
-                .unwrap()
+                .await
                 .mixers
                 .get("test_input_add")
                 .unwrap()
@@ -331,15 +347,19 @@ mod tests {
             name: mixer_name.to_string(),
             ..mixer::default_config()
         };
-        server.mixer_create(config).expect("failed to create mixer");
+        server
+            .mixer_create(config)
+            .await
+            .expect("failed to create mixer");
         server
             .input_add(
                 mixer_name,
                 mixer::input::Fake::new("fakesrc").expect("failed to create fakesrc"),
             )
+            .await
             .expect("Failed to add input");
 
-        let api = filters::input_get(server.mixers.clone());
+        let api = filters::input_get(Arc::clone(&server.mixers));
 
         let resp = request()
             .method("GET")
@@ -359,15 +379,19 @@ mod tests {
             name: mixer_name.to_string(),
             ..mixer::default_config()
         };
-        server.mixer_create(config).expect("failed to create mixer");
+        server
+            .mixer_create(config)
+            .await
+            .expect("failed to create mixer");
         server
             .input_add(
                 mixer_name,
                 mixer::input::Fake::new("fakesrc").expect("failed to create fakesrc"),
             )
+            .await
             .expect("Failed to add input");
 
-        let api = filters::input_remove(server.mixers.clone());
+        let api = filters::input_remove(Arc::clone(&server.mixers));
 
         let resp = request()
             .method("DELETE")
@@ -381,7 +405,7 @@ mod tests {
             server
                 .mixers
                 .lock()
-                .unwrap()
+                .await
                 .mixers
                 .get(mixer_name)
                 .unwrap()
@@ -397,8 +421,11 @@ mod tests {
             name: "test_output_list".to_string(),
             ..mixer::default_config()
         };
-        server.mixer_create(config).expect("failed to create mixer");
-        let api = filters::output_list(server.mixers.clone());
+        server
+            .mixer_create(config)
+            .await
+            .expect("failed to create mixer");
+        let api = filters::output_list(Arc::clone(&server.mixers));
 
         let resp = request()
             .method("GET")
@@ -417,8 +444,11 @@ mod tests {
             name: "test_output_add".to_string(),
             ..mixer::default_config()
         };
-        server.mixer_create(config).expect("failed to create mixer");
-        let api = filters::output_add(server.mixers.clone());
+        server
+            .mixer_create(config)
+            .await
+            .expect("failed to create mixer");
+        let api = filters::output_add(Arc::clone(&server.mixers));
 
         let resp = request()
             .method("POST")
@@ -437,7 +467,7 @@ mod tests {
             server
                 .mixers
                 .lock()
-                .unwrap()
+                .await
                 .mixers
                 .get("test_output_add")
                 .unwrap()
@@ -454,15 +484,19 @@ mod tests {
             name: mixer_name.to_string(),
             ..mixer::default_config()
         };
-        server.mixer_create(config).expect("failed to create mixer");
+        server
+            .mixer_create(config)
+            .await
+            .expect("failed to create mixer");
         server
             .output_add(
                 mixer_name,
                 mixer::output::Fake::new("fake").expect("failed to create fake output"),
             )
+            .await
             .expect("Failed to add output");
 
-        let api = filters::output_get(server.mixers.clone());
+        let api = filters::output_get(Arc::clone(&server.mixers));
 
         let resp = request()
             .method("GET")
@@ -482,15 +516,19 @@ mod tests {
             name: mixer_name.to_string(),
             ..mixer::default_config()
         };
-        server.mixer_create(config).expect("failed to create mixer");
+        server
+            .mixer_create(config)
+            .await
+            .expect("failed to create mixer");
         server
             .output_add(
                 mixer_name,
                 mixer::output::Fake::new("fake").expect("failed to create fake output"),
             )
+            .await
             .expect("Failed to add output");
 
-        let api = filters::output_remove(server.mixers.clone());
+        let api = filters::output_remove(Arc::clone(&server.mixers));
 
         let resp = request()
             .method("DELETE")
@@ -504,7 +542,7 @@ mod tests {
             server
                 .mixers
                 .lock()
-                .unwrap()
+                .await
                 .mixers
                 .get(mixer_name)
                 .unwrap()
