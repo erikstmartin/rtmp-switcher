@@ -148,6 +148,8 @@ impl URI {
                 .expect("Failed to get first structure of caps.");
             let new_pad_type = new_pad_struct.get_name();
 
+            let running_time = video.get_current_running_time();
+
             if new_pad_type.starts_with("audio/x-raw") {
                 let sink_pad = audio
                     .get_static_pad("sink")
@@ -156,6 +158,11 @@ impl URI {
                     println!("We are already linked. Ignoring.");
                     return;
                 }
+
+                // Offset src_pad by current running time. So that videos do not fast-forward to
+                // get in sync with running time of pipeline.
+                src_pad
+                    .set_offset(gst::format::GenericFormattedValue::Time(running_time).get_value());
 
                 let res = src_pad.link(&sink_pad);
                 if res.is_err() {
@@ -171,6 +178,11 @@ impl URI {
                     println!("We are already linked. Ignoring.");
                     return;
                 }
+
+                // Offset src_pad by current running time. So that videos do not fast-forward to
+                // get in sync with running time of pipeline.
+                src_pad
+                    .set_offset(gst::format::GenericFormattedValue::Time(running_time).get_value());
 
                 let res = src_pad.link(&sink_pad);
                 if res.is_err() {
