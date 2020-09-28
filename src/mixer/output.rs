@@ -236,7 +236,7 @@ impl RTMP {
             Some(format!("{}_video_capsfilter", name).as_str()),
         )?;
         let video_caps = gst::Caps::builder("video/x-raw")
-            .field("framerate", &gst::Fraction::new(60, 1))
+            .field("framerate", &gst::Fraction::new(30, 1))
             .build();
         video_capsfilter.set_property("caps", &video_caps).unwrap();
 
