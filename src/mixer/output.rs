@@ -237,6 +237,8 @@ impl RTMP {
         )?;
         let video_caps = gst::Caps::builder("video/x-raw")
             .field("framerate", &gst::Fraction::new(30, 1))
+            .field("format", &"I420")
+            .field("profile", &"high")
             .build();
         video_capsfilter.set_property("caps", &video_caps).unwrap();
 
