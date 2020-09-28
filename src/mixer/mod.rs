@@ -91,7 +91,7 @@ impl Mixer {
         pipeline.add_many(&[&audio_mixer, &volume, &audio_capsfilter, &audio_tee])?;
         gst::Element::link_many(&[&audio_mixer, &volume, &audio_capsfilter, &audio_tee])?;
 
-        let mut mixer = Mixer {
+        let mixer = Mixer {
             config: config.clone(),
             pipeline,
             join_handle: None,

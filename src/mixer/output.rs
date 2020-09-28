@@ -207,6 +207,7 @@ pub struct RTMP {
     video_rate: gst::Element,
     video_capsfilter: gst::Element,
     x264enc: gst::Element,
+    h264parse: gst::Element,
     flvqueue: gst::Element,
     flvmux: gst::Element,
     queue_sink: gst::Element,
@@ -223,6 +224,7 @@ impl RTMP {
         // Video stream
         let video_queue =
             gst::ElementFactory::make("queue", Some(format!("{}_video_queue", name).as_str()))?;
+
         let video_convert = gst::ElementFactory::make(
             "videoconvert",
             Some(format!("{}_videoconvert", name).as_str()),
@@ -243,15 +245,16 @@ impl RTMP {
         video_capsfilter.set_property("caps", &video_caps).unwrap();
 
         let x264enc =
-            gst::ElementFactory::make("x264enc", Some(format!("{}_x264enc", name).as_str()))?;
-        x264enc.set_property("key-int-max", &60u32)?;
+            gst::ElementFactory::make("nvh264enc", Some(format!("{}_x264enc", name).as_str()))?;
+        let h264parse =
+            gst::ElementFactory::make("h264parse", Some(format!("{}_h264parse", name).as_str()))?;
 
         let flvqueue = gst::ElementFactory::make("queue", Some(format!("{}_flv", name).as_str()))?;
         let flvmux =
             gst::ElementFactory::make("flvmux", Some(format!("{}_flvmux", name).as_str()))?;
         flvmux.set_property_from_str("streamable", "true");
         let queue_sink =
-            gst::ElementFactory::make("queue2", Some(format!("{}_queuesink", name).as_str()))?;
+            gst::ElementFactory::make("queue", Some(format!("{}_queuesink", name).as_str()))?;
         let video_sink =
             gst::ElementFactory::make("rtmpsink", Some(format!("{}_video_sink", name).as_str()))?;
         video_sink.set_property("location", &uri)?;
@@ -280,6 +283,7 @@ impl RTMP {
             video_rate,
             video_capsfilter,
             x264enc,
+            h264parse,
             flvqueue,
             flvmux,
             queue_sink,
@@ -308,6 +312,7 @@ impl RTMP {
             &self.video_rate,
             &self.video_capsfilter,
             &self.x264enc,
+            &self.h264parse,
             &self.flvqueue,
             &self.flvmux,
             &self.queue_sink,
@@ -322,6 +327,7 @@ impl RTMP {
             &self.video_rate,
             &self.video_capsfilter,
             &self.x264enc,
+            &self.h264parse,
             &self.flvqueue,
             &self.flvmux,
             &self.queue_sink,
@@ -362,6 +368,7 @@ impl RTMP {
             &self.video_rate,
             &self.video_capsfilter,
             &self.x264enc,
+            &self.h264parse,
             &self.flvqueue,
             &self.flvmux,
             &self.queue_sink,
@@ -385,6 +392,7 @@ impl RTMP {
         self.video_rate.set_state(state)?;
         self.video_capsfilter.set_state(state)?;
         self.x264enc.set_state(state)?;
+        self.h264parse.set_state(state)?;
         self.flvqueue.set_state(state)?;
         self.flvmux.set_state(state)?;
         self.queue_sink.set_state(state)?;
