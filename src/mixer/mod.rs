@@ -230,6 +230,33 @@ impl Mixer {
     pub fn config(&self) -> Config {
         self.config.clone()
     }
+
+    pub fn input_set_active(&mut self, name: &str) -> Result<()> {
+        if !self.inputs.contains_key(name) {
+            return Err(Error::NotFound("input".to_string(), name.to_string()));
+        }
+
+        let input = self.inputs.get_mut(name).unwrap();
+
+        input.set_zorder(1000)?;
+        input.set_xpos(0)?;
+        input.set_ypos(0)?;
+        input.set_width(self.config.video.width.unwrap())?;
+        input.set_height(self.config.video.height.unwrap())?;
+
+        let input_config = input.config();
+        input.set_volume(input_config.audio.volume.unwrap())?;
+
+        // Decrease volume and restore zorder of all other inputs
+        for (n, input) in self.inputs.iter_mut() {
+            if n != name {
+                input.set_volume(0.0)?;
+                input.set_zorder(input_config.video.zorder.unwrap())?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 fn watch_bus(pipeline: gst::Pipeline) {

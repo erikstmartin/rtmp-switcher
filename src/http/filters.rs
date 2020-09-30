@@ -50,6 +50,7 @@ pub fn routes(
         .or(input_add(mixers.clone()))
         .or(input_update(mixers.clone()))
         .or(input_remove(mixers.clone()))
+        .or(input_set_active(mixers.clone()))
         .or(output_list(mixers.clone()))
         .or(output_get(mixers.clone()))
         .or(output_add(mixers.clone()))
@@ -138,6 +139,15 @@ pub(crate) fn input_remove(
         .and(warp::delete())
         .and(with_mixers(mixers))
         .and_then(handlers::input_remove)
+}
+
+pub(crate) fn input_set_active(
+    mixers: Arc<Mutex<super::Mixers>>,
+) -> impl Filter<Extract = impl Reply, Error = warp::Rejection> + Clone {
+    warp::path!("mixers" / String / "set_active_input" / String)
+        .and(warp::post())
+        .and(with_mixers(mixers))
+        .and_then(handlers::input_set_active)
 }
 
 pub(crate) fn output_list(

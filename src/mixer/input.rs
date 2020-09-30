@@ -122,11 +122,20 @@ impl Input {
             Input::Fake(input) => input.set_alpha(alpha),
         }
     }
+
+    pub fn config(&self) -> mixer::Config {
+        match self {
+            Input::URI(input) => input.config(),
+            Input::Test(input) => input.config(),
+            Input::Fake(input) => input.config(),
+        }
+    }
 }
 
 pub struct URI {
     pub name: String,
     pub location: String,
+    config: mixer::Config,
     pipeline: Option<gst::Pipeline>,
     source: gst::Element,
     audioconvert: gst::Element,
@@ -190,6 +199,7 @@ impl URI {
         let audio = audioconvert.clone();
         let video = videoconvert.clone();
         let vqueue = videoqueue.clone();
+        let video_config = config.video.clone();
         source.connect_pad_added(move |src, src_pad| {
             println!(
                 "Received new pad {} from {}",
@@ -246,23 +256,23 @@ impl URI {
                     let compositor_pad = queue_pad.get_peer().unwrap();
 
                     // Look at config
-                    if let Some(zorder) = config.video.zorder {
+                    if let Some(zorder) = video_config.zorder {
                         compositor_pad.set_property("zorder", &zorder);
                     }
 
-                    if let Some(alpha) = config.video.alpha {
+                    if let Some(alpha) = video_config.alpha {
                         compositor_pad.set_property("alpha", &alpha);
                     }
 
-                    if let Some(xpos) = config.video.xpos {
+                    if let Some(xpos) = video_config.xpos {
                         compositor_pad.set_property("xpos", &xpos);
                     }
 
-                    if let Some(ypos) = config.video.ypos {
+                    if let Some(ypos) = video_config.ypos {
                         compositor_pad.set_property("ypos", &ypos);
                     }
 
-                    if let Some(repeat) = config.video.repeat {
+                    if let Some(repeat) = video_config.repeat {
                         compositor_pad.set_property("repeat-after-eos", &repeat);
                     }
                 }
@@ -279,6 +289,7 @@ impl URI {
         Ok(Input::URI(Self {
             name: name.to_string(),
             location: name.to_string(),
+            config,
             pipeline: None,
             source,
             audioconvert,
@@ -334,6 +345,17 @@ impl URI {
             &video,
         ])?;
 
+        let prop = self
+            .videoqueue
+            .get_static_pad("src")
+            .unwrap()
+            .get_peer()
+            .unwrap()
+            .get_property("zorder")?;
+        let zorder = prop.downcast::<u32>().map_err(|_| mixer::Error::Unknown)?;
+
+        self.config.video.zorder = Some(zorder.get_some());
+
         Ok(())
     }
 
@@ -372,11 +394,13 @@ impl URI {
     }
 
     pub fn set_volume(&mut self, volume: f64) -> Result<()> {
+        self.config.audio.volume = Some(volume);
         self.volume.set_property("volume", &volume)?;
         Ok(())
     }
 
     pub fn set_zorder(&mut self, zorder: u32) -> Result<()> {
+        self.config.video.zorder = Some(zorder);
         set_peer_pad_property(
             &self.videoqueue.get_static_pad("src").unwrap(),
             "zorder",
@@ -387,6 +411,7 @@ impl URI {
     }
 
     pub fn set_width(&mut self, width: i32) -> Result<()> {
+        self.config.video.width = Some(width);
         set_peer_pad_property(
             &self.videoqueue.get_static_pad("src").unwrap(),
             "width",
@@ -397,6 +422,7 @@ impl URI {
     }
 
     pub fn set_height(&mut self, height: i32) -> Result<()> {
+        self.config.video.height = Some(height);
         set_peer_pad_property(
             &self.videoqueue.get_static_pad("src").unwrap(),
             "height",
@@ -407,6 +433,7 @@ impl URI {
     }
 
     pub fn set_xpos(&mut self, xpos: i32) -> Result<()> {
+        self.config.video.xpos = Some(xpos);
         set_peer_pad_property(
             &self.videoqueue.get_static_pad("src").unwrap(),
             "xpos",
@@ -417,6 +444,7 @@ impl URI {
     }
 
     pub fn set_ypos(&mut self, ypos: i32) -> Result<()> {
+        self.config.video.ypos = Some(ypos);
         set_peer_pad_property(
             &self.videoqueue.get_static_pad("src").unwrap(),
             "ypos",
@@ -427,6 +455,7 @@ impl URI {
     }
 
     pub fn set_alpha(&mut self, alpha: f64) -> Result<()> {
+        self.config.video.alpha = Some(alpha);
         set_peer_pad_property(
             &self.videoqueue.get_static_pad("src").unwrap(),
             "alpha",
@@ -435,11 +464,16 @@ impl URI {
 
         Ok(())
     }
+
+    pub fn config(&self) -> mixer::Config {
+        self.config.clone()
+    }
 }
 
 pub struct Test {
     pub name: String,
     pipeline: Option<gst::Pipeline>,
+    config: mixer::Config,
     audio: gst::Element,
     audio_convert: gst::Element,
     audio_resample: gst::Element,
@@ -481,8 +515,9 @@ impl Test {
         let audio_queue = gst::ElementFactory::make("queue", Some("audiotestsrc_queue"))?;
 
         Ok(Input::Test(Test {
-            name: config.name,
+            name: config.name.clone(),
             pipeline: None,
+            config,
             audio,
             audio_queue,
             audio_resample,
@@ -605,28 +640,38 @@ impl Test {
     pub fn set_alpha(&mut self, ypos: f64) -> Result<()> {
         todo!()
     }
+
+    pub fn config(&self) -> mixer::Config {
+        self.config.clone()
+    }
 }
 
 pub struct Fake {
     pub name: String,
     pipeline: Option<gst::Pipeline>,
+    config: mixer::Config,
     audio: gst::Element,
     video: gst::Element,
 }
 
 impl Fake {
-    pub fn new(name: &str) -> Result<Input> {
-        let audio =
-            gst::ElementFactory::make("fakesrc", Some(format!("{}_audio_source", name).as_str()))?;
+    pub fn new(config: mixer::Config) -> Result<Input> {
+        let audio = gst::ElementFactory::make(
+            "fakesrc",
+            Some(format!("{}_audio_source", config.name).as_str()),
+        )?;
         audio.set_property("is-live", &true)?;
 
-        let video =
-            gst::ElementFactory::make("fakesrc", Some(format!("{}_video_source", name).as_str()))?;
+        let video = gst::ElementFactory::make(
+            "fakesrc",
+            Some(format!("{}_video_source", config.name).as_str()),
+        )?;
         video.set_property("is-live", &true)?;
 
         Ok(Input::Fake(Fake {
-            name: name.to_string(),
+            name: config.name.to_string(),
             pipeline: None,
+            config,
             audio,
             video,
         }))
@@ -700,6 +745,10 @@ impl Fake {
 
     pub fn set_alpha(&mut self, ypos: f64) -> Result<()> {
         todo!()
+    }
+
+    pub fn config(&self) -> mixer::Config {
+        self.config.clone()
     }
 }
 

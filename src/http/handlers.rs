@@ -156,7 +156,7 @@ pub async fn input_add(
     let input = match input.input_type.as_str() {
         "URI" => crate::mixer::input::URI::new(config, &input.location)
             .map_err(|e| super::Error::Mixer(e)),
-        "Fake" => crate::mixer::input::Fake::new(&input.name).map_err(|e| super::Error::Mixer(e)),
+        "Fake" => crate::mixer::input::Fake::new(config).map_err(|e| super::Error::Mixer(e)),
         "Test" => crate::mixer::input::Test::new(config).map_err(|e| super::Error::Mixer(e)),
         _ => Err(super::Error::Unknown),
     };
@@ -350,6 +350,46 @@ pub async fn input_remove(
         Ok(_) => Ok(warp::reply::with_status(
             warp::reply::json(&Response {
                 message: "Input removed".to_string(),
+            }),
+            StatusCode::OK,
+        )),
+        Err(e) => match e {
+            mixer::Error::NotFound(_, _) => Ok(warp::reply::with_status(
+                warp::reply::json(&Response {
+                    message: format!("{}", e),
+                }),
+                StatusCode::NOT_FOUND,
+            )),
+            e => Ok(warp::reply::with_status(
+                warp::reply::json(&Response {
+                    message: format!("{}", e),
+                }),
+                StatusCode::INTERNAL_SERVER_ERROR,
+            )),
+        },
+    }
+}
+
+pub async fn input_set_active(
+    mixer_name: String,
+    input_name: String,
+    mixers: Arc<Mutex<super::Mixers>>,
+) -> Result<impl warp::Reply, Infallible> {
+    let mut mixers = mixers.lock().await;
+    let mixer = mixers.mixers.get_mut(&mixer_name);
+    if mixer.is_none() {
+        return Ok(warp::reply::with_status(
+            warp::reply::json(&Response {
+                message: "Mixer not found".to_string(),
+            }),
+            StatusCode::NOT_FOUND,
+        ));
+    }
+
+    match mixer.unwrap().input_set_active(&input_name) {
+        Ok(_) => Ok(warp::reply::with_status(
+            warp::reply::json(&Response {
+                message: "Input set to active".to_string(),
             }),
             StatusCode::OK,
         )),
