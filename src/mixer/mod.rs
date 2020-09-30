@@ -16,6 +16,10 @@ pub struct VideoConfig {
     pub format: Option<String>,
     pub width: Option<i32>,
     pub height: Option<i32>,
+    pub xpos: Option<i32>,
+    pub ypos: Option<i32>,
+    pub zorder: Option<u32>,
+    pub alpha: Option<f64>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -289,6 +293,10 @@ pub fn default_video_config() -> VideoConfig {
         framerate: Some(30),
         width: Some(1920),
         height: Some(1080),
+        zorder: None,
+        xpos: None,
+        ypos: None,
+        alpha: None,
         format: Some("RGBA".to_string()),
     }
 }

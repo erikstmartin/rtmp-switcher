@@ -53,8 +53,8 @@ pub struct InputCreateRequest {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct InputUpdateRequest {
-    pub volume: Option<f64>,
-    pub zorder: Option<u32>,
+    pub audio: Option<mixer::AudioConfig>,
+    pub video: Option<mixer::VideoConfig>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

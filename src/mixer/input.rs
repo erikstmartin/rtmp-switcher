@@ -82,6 +82,46 @@ impl Input {
             Input::Fake(input) => input.set_zorder(zorder),
         }
     }
+
+    pub fn set_width(&mut self, width: i32) -> Result<()> {
+        match self {
+            Input::URI(input) => input.set_width(width),
+            Input::Test(input) => input.set_width(width),
+            Input::Fake(input) => input.set_width(width),
+        }
+    }
+
+    pub fn set_height(&mut self, height: i32) -> Result<()> {
+        match self {
+            Input::URI(input) => input.set_height(height),
+            Input::Test(input) => input.set_height(height),
+            Input::Fake(input) => input.set_height(height),
+        }
+    }
+
+    pub fn set_xpos(&mut self, xpos: i32) -> Result<()> {
+        match self {
+            Input::URI(input) => input.set_xpos(xpos),
+            Input::Test(input) => input.set_xpos(xpos),
+            Input::Fake(input) => input.set_xpos(xpos),
+        }
+    }
+
+    pub fn set_ypos(&mut self, ypos: i32) -> Result<()> {
+        match self {
+            Input::URI(input) => input.set_ypos(ypos),
+            Input::Test(input) => input.set_ypos(ypos),
+            Input::Fake(input) => input.set_ypos(ypos),
+        }
+    }
+
+    pub fn set_alpha(&mut self, alpha: f64) -> Result<()> {
+        match self {
+            Input::URI(input) => input.set_alpha(alpha),
+            Input::Test(input) => input.set_alpha(alpha),
+            Input::Fake(input) => input.set_alpha(alpha),
+        }
+    }
 }
 
 pub struct URI {
@@ -102,7 +142,7 @@ pub struct URI {
 
 impl URI {
     pub fn new(config: mixer::Config, uri: &str) -> Result<Input> {
-        let name = config.name;
+        let name = config.name.clone();
 
         let source =
             gst::ElementFactory::make("uridecodebin", Some(format!("{}_source", name).as_str()))?;
@@ -149,6 +189,7 @@ impl URI {
 
         let audio = audioconvert.clone();
         let video = videoconvert.clone();
+        let vqueue = videoqueue.clone();
         source.connect_pad_added(move |src, src_pad| {
             println!(
                 "Received new pad {} from {}",
@@ -199,6 +240,28 @@ impl URI {
                 // get in sync with running time of pipeline.
                 src_pad
                     .set_offset(gst::format::GenericFormattedValue::Time(running_time).get_value());
+
+                let queue_pad = vqueue.get_static_pad("src").unwrap();
+                if queue_pad.is_linked() {
+                    let compositor_pad = queue_pad.get_peer().unwrap();
+
+                    // Look at config
+                    if let Some(zorder) = config.video.zorder {
+                        dbg!(compositor_pad.set_property("zorder", &zorder));
+                    }
+
+                    if let Some(alpha) = config.video.alpha {
+                        dbg!(compositor_pad.set_property("alpha", &alpha));
+                    }
+
+                    if let Some(xpos) = config.video.xpos {
+                        dbg!(compositor_pad.set_property("xpos", &xpos));
+                    }
+
+                    if let Some(ypos) = config.video.ypos {
+                        dbg!(compositor_pad.set_property("ypos", &ypos));
+                    }
+                }
 
                 let res = src_pad.link(&sink_pad);
                 if res.is_err() {
@@ -310,13 +373,61 @@ impl URI {
     }
 
     pub fn set_zorder(&mut self, zorder: u32) -> Result<()> {
-        let peer_pad = self
-            .videoqueue
-            .get_static_pad("src")
-            .unwrap()
-            .get_peer()
-            .unwrap();
-        peer_pad.set_property("zorder", &zorder)?;
+        set_peer_pad_property(
+            &self.videoqueue.get_static_pad("src").unwrap(),
+            "zorder",
+            &zorder,
+        )?;
+
+        Ok(())
+    }
+
+    pub fn set_width(&mut self, width: i32) -> Result<()> {
+        set_peer_pad_property(
+            &self.videoqueue.get_static_pad("src").unwrap(),
+            "width",
+            &width,
+        )?;
+
+        Ok(())
+    }
+
+    pub fn set_height(&mut self, height: i32) -> Result<()> {
+        set_peer_pad_property(
+            &self.videoqueue.get_static_pad("src").unwrap(),
+            "height",
+            &height,
+        )?;
+
+        Ok(())
+    }
+
+    pub fn set_xpos(&mut self, xpos: i32) -> Result<()> {
+        set_peer_pad_property(
+            &self.videoqueue.get_static_pad("src").unwrap(),
+            "xpos",
+            &xpos,
+        )?;
+
+        Ok(())
+    }
+
+    pub fn set_ypos(&mut self, ypos: i32) -> Result<()> {
+        set_peer_pad_property(
+            &self.videoqueue.get_static_pad("src").unwrap(),
+            "ypos",
+            &ypos,
+        )?;
+
+        Ok(())
+    }
+
+    pub fn set_alpha(&mut self, alpha: f64) -> Result<()> {
+        set_peer_pad_property(
+            &self.videoqueue.get_static_pad("src").unwrap(),
+            "alpha",
+            &alpha,
+        )?;
 
         Ok(())
     }
@@ -462,16 +573,33 @@ impl Test {
     }
 
     pub fn set_zorder(&mut self, zorder: u32) -> Result<()> {
-        let peer_pad = self
-            .video_capsfilter
-            .get_static_pad("src")
-            .unwrap()
-            .get_peer()
-            .unwrap();
-
-        peer_pad.set_property("zorder", &zorder)?;
+        set_peer_pad_property(
+            &self.video_capsfilter.get_static_pad("src").unwrap(),
+            "zorder",
+            &zorder,
+        )?;
 
         Ok(())
+    }
+
+    pub fn set_width(&mut self, width: i32) -> Result<()> {
+        todo!()
+    }
+
+    pub fn set_height(&mut self, height: i32) -> Result<()> {
+        todo!()
+    }
+
+    pub fn set_xpos(&mut self, xpos: i32) -> Result<()> {
+        todo!()
+    }
+
+    pub fn set_ypos(&mut self, ypos: i32) -> Result<()> {
+        todo!()
+    }
+
+    pub fn set_alpha(&mut self, ypos: f64) -> Result<()> {
+        todo!()
     }
 }
 
@@ -541,17 +669,41 @@ impl Fake {
     }
 
     pub fn set_zorder(&mut self, zorder: u32) -> Result<()> {
-        let peer_pad = self
-            .video
-            .get_static_pad("src")
-            .unwrap()
-            .get_peer()
-            .unwrap();
-
-        peer_pad.set_property("zorder", &zorder)?;
+        set_peer_pad_property(
+            &self.video.get_static_pad("src").unwrap(),
+            "zorder",
+            &zorder,
+        )?;
 
         Ok(())
     }
+
+    pub fn set_width(&mut self, width: i32) -> Result<()> {
+        todo!()
+    }
+
+    pub fn set_height(&mut self, height: i32) -> Result<()> {
+        todo!()
+    }
+
+    pub fn set_xpos(&mut self, xpos: i32) -> Result<()> {
+        todo!()
+    }
+
+    pub fn set_ypos(&mut self, ypos: i32) -> Result<()> {
+        todo!()
+    }
+
+    pub fn set_alpha(&mut self, ypos: f64) -> Result<()> {
+        todo!()
+    }
+}
+
+fn set_peer_pad_property(pad: &gst::Pad, property: &str, value: &dyn ToValue) -> Result<()> {
+    let peer_pad = pad.get_peer().unwrap();
+
+    peer_pad.set_property(property, value)?;
+    Ok(())
 }
 
 fn release_request_pad(elem: &gst::Element) -> Result<()> {

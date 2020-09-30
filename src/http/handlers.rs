@@ -293,12 +293,33 @@ pub async fn input_update(
     }
 
     let input = input.unwrap();
-    if let Some(volume) = request.volume {
+    if let Some(volume) = request.audio.unwrap().volume {
         input.set_volume(volume);
     }
 
-    if let Some(zorder) = request.zorder {
+    let video_config = request.video.unwrap();
+    if let Some(zorder) = video_config.zorder {
         input.set_zorder(zorder);
+    }
+
+    if let Some(width) = video_config.width {
+        input.set_width(width);
+    }
+
+    if let Some(height) = video_config.height {
+        input.set_height(height);
+    }
+
+    if let Some(xpos) = video_config.xpos {
+        input.set_xpos(xpos);
+    }
+
+    if let Some(ypos) = video_config.ypos {
+        input.set_ypos(ypos);
+    }
+
+    if let Some(alpha) = video_config.alpha {
+        input.set_alpha(alpha);
     }
 
     Ok(warp::reply::with_status(
