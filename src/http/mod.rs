@@ -52,6 +52,12 @@ pub struct InputCreateRequest {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct InputUpdateRequest {
+    pub volume: Option<f64>,
+    pub zorder: Option<u32>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct InputResponse {
     pub name: String,
     pub input_type: String,

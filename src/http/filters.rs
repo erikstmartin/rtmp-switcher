@@ -24,6 +24,13 @@ fn input_json_body(
     warp::body::content_length_limit(1024 * 16).and(warp::body::json())
 }
 
+fn input_update_json_body(
+) -> impl Filter<Extract = (super::InputUpdateRequest,), Error = warp::Rejection> + Clone {
+    // When accepting a body, we want a JSON body
+    // (and to reject huge payloads)...
+    warp::body::content_length_limit(1024 * 16).and(warp::body::json())
+}
+
 fn output_json_body(
 ) -> impl Filter<Extract = (super::OutputCreateRequest,), Error = warp::Rejection> + Clone {
     // When accepting a body, we want a JSON body
@@ -41,6 +48,7 @@ pub fn routes(
         .or(input_list(mixers.clone()))
         .or(input_get(mixers.clone()))
         .or(input_add(mixers.clone()))
+        .or(input_update(mixers.clone()))
         .or(input_remove(mixers.clone()))
         .or(output_list(mixers.clone()))
         .or(output_get(mixers.clone()))
@@ -111,6 +119,16 @@ pub(crate) fn input_get(
         .and(warp::get())
         .and(with_mixers(mixers))
         .and_then(handlers::input_get)
+}
+
+pub(crate) fn input_update(
+    mixers: Arc<Mutex<super::Mixers>>,
+) -> impl Filter<Extract = impl Reply, Error = warp::Rejection> + Clone {
+    warp::path!("mixers" / String / "inputs" / String)
+        .and(warp::put())
+        .and(input_update_json_body())
+        .and(with_mixers(mixers))
+        .and_then(handlers::input_update)
 }
 
 pub(crate) fn input_remove(

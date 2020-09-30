@@ -66,6 +66,22 @@ impl Input {
             Input::Fake(input) => input.set_state(state),
         }
     }
+
+    pub fn set_volume(&mut self, volume: f64) -> Result<()> {
+        match self {
+            Input::URI(input) => input.set_volume(volume),
+            Input::Test(input) => input.set_volume(volume),
+            Input::Fake(input) => input.set_volume(volume),
+        }
+    }
+
+    pub fn set_zorder(&mut self, zorder: u32) -> Result<()> {
+        match self {
+            Input::URI(input) => input.set_zorder(zorder),
+            Input::Test(input) => input.set_zorder(zorder),
+            Input::Fake(input) => input.set_zorder(zorder),
+        }
+    }
 }
 
 pub struct URI {
@@ -287,6 +303,23 @@ impl URI {
         self.videoqueue.set_state(state)?;
         Ok(())
     }
+
+    pub fn set_volume(&mut self, volume: f64) -> Result<()> {
+        self.volume.set_property("volume", &volume)?;
+        Ok(())
+    }
+
+    pub fn set_zorder(&mut self, zorder: u32) -> Result<()> {
+        let peer_pad = self
+            .videoqueue
+            .get_static_pad("src")
+            .unwrap()
+            .get_peer()
+            .unwrap();
+        peer_pad.set_property("zorder", &zorder)?;
+
+        Ok(())
+    }
 }
 
 pub struct Test {
@@ -423,6 +456,23 @@ impl Test {
         self.video_capsfilter.set_state(state)?;
         Ok(())
     }
+
+    pub fn set_volume(&mut self, _volume: f64) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn set_zorder(&mut self, zorder: u32) -> Result<()> {
+        let peer_pad = self
+            .video_capsfilter
+            .get_static_pad("src")
+            .unwrap()
+            .get_peer()
+            .unwrap();
+
+        peer_pad.set_property("zorder", &zorder)?;
+
+        Ok(())
+    }
 }
 
 pub struct Fake {
@@ -483,6 +533,23 @@ impl Fake {
     pub fn set_state(&mut self, state: gst::State) -> Result<()> {
         self.audio.set_state(state)?;
         self.video.set_state(state)?;
+        Ok(())
+    }
+
+    pub fn set_volume(&mut self, _volume: f64) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn set_zorder(&mut self, zorder: u32) -> Result<()> {
+        let peer_pad = self
+            .video
+            .get_static_pad("src")
+            .unwrap()
+            .get_peer()
+            .unwrap();
+
+        peer_pad.set_property("zorder", &zorder)?;
+
         Ok(())
     }
 }

@@ -265,6 +265,50 @@ pub async fn input_get(
     Ok(response)
 }
 
+pub async fn input_update(
+    mixer_name: String,
+    input_name: String,
+    request: super::InputUpdateRequest,
+    mixers: Arc<Mutex<super::Mixers>>,
+) -> Result<impl warp::Reply, Infallible> {
+    let mut mixers = mixers.lock().await;
+    let mixer = mixers.mixers.get_mut(&mixer_name);
+    if mixer.is_none() {
+        return Ok(warp::reply::with_status(
+            warp::reply::json(&Response {
+                message: "Mixer not found".to_string(),
+            }),
+            StatusCode::NOT_FOUND,
+        ));
+    }
+
+    let input: Option<&mut mixer::Input> = mixer.unwrap().inputs.get_mut(input_name.as_str());
+    if input.is_none() {
+        return Ok(warp::reply::with_status(
+            warp::reply::json(&Response {
+                message: "Input not found".to_string(),
+            }),
+            StatusCode::OK,
+        ));
+    }
+
+    let input = input.unwrap();
+    if let Some(volume) = request.volume {
+        input.set_volume(volume);
+    }
+
+    if let Some(zorder) = request.zorder {
+        input.set_zorder(zorder);
+    }
+
+    Ok(warp::reply::with_status(
+        warp::reply::json(&Response {
+            message: "Input updated".to_string(),
+        }),
+        StatusCode::OK,
+    ))
+}
+
 pub async fn input_remove(
     mixer_name: String,
     input_name: String,
