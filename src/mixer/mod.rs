@@ -20,6 +20,7 @@ pub struct VideoConfig {
     pub ypos: Option<i32>,
     pub zorder: Option<u32>,
     pub alpha: Option<f64>,
+    pub repeat: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -297,6 +298,7 @@ pub fn default_video_config() -> VideoConfig {
         xpos: None,
         ypos: None,
         alpha: None,
+        repeat: None,
         format: Some("RGBA".to_string()),
     }
 }

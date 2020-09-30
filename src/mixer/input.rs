@@ -247,19 +247,23 @@ impl URI {
 
                     // Look at config
                     if let Some(zorder) = config.video.zorder {
-                        dbg!(compositor_pad.set_property("zorder", &zorder));
+                        compositor_pad.set_property("zorder", &zorder);
                     }
 
                     if let Some(alpha) = config.video.alpha {
-                        dbg!(compositor_pad.set_property("alpha", &alpha));
+                        compositor_pad.set_property("alpha", &alpha);
                     }
 
                     if let Some(xpos) = config.video.xpos {
-                        dbg!(compositor_pad.set_property("xpos", &xpos));
+                        compositor_pad.set_property("xpos", &xpos);
                     }
 
                     if let Some(ypos) = config.video.ypos {
-                        dbg!(compositor_pad.set_property("ypos", &ypos));
+                        compositor_pad.set_property("ypos", &ypos);
+                    }
+
+                    if let Some(repeat) = config.video.repeat {
+                        compositor_pad.set_property("repeat-after-eos", &repeat);
                     }
                 }
 
