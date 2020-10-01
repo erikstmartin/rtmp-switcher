@@ -11,35 +11,6 @@ fn with_mixers(
     warp::any().map(move || mixers.clone())
 }
 
-fn mixer_json_body(
-) -> impl Filter<Extract = (mixer::CreateRequest,), Error = warp::Rejection> + Clone {
-    // When accepting a body, we want a JSON body
-    // (and to reject huge payloads)...
-    warp::body::content_length_limit(1024 * 16).and(warp::body::json())
-}
-
-// TODO: Can we use generics so that we don't need to duplicate this?
-fn input_json_body(
-) -> impl Filter<Extract = (input::CreateRequest,), Error = warp::Rejection> + Clone {
-    // When accepting a body, we want a JSON body
-    // (and to reject huge payloads)...
-    warp::body::content_length_limit(1024 * 16).and(warp::body::json())
-}
-
-fn input_update_json_body(
-) -> impl Filter<Extract = (input::UpdateRequest,), Error = warp::Rejection> + Clone {
-    // When accepting a body, we want a JSON body
-    // (and to reject huge payloads)...
-    warp::body::content_length_limit(1024 * 16).and(warp::body::json())
-}
-
-fn output_json_body(
-) -> impl Filter<Extract = (output::CreateRequest,), Error = warp::Rejection> + Clone {
-    // When accepting a body, we want a JSON body
-    // (and to reject huge payloads)...
-    warp::body::content_length_limit(1024 * 16).and(warp::body::json())
-}
-
 pub fn routes(
     mixers: Arc<Mutex<super::Mixers>>,
 ) -> impl Filter<Extract = impl Reply, Error = warp::Rejection> + Clone {
@@ -64,7 +35,7 @@ pub(crate) fn mixer_create(
 ) -> impl Filter<Extract = impl Reply, Error = warp::Rejection> + Clone {
     warp::path!("mixers")
         .and(warp::post())
-        .and(mixer_json_body())
+        .and(mixer::CreateRequest::from_json_body())
         .and(with_mixers(mixers))
         .and_then(mixer::create)
 }
@@ -101,7 +72,7 @@ pub(crate) fn input_add(
 ) -> impl Filter<Extract = impl Reply, Error = warp::Rejection> + Clone {
     warp::path!("mixers" / String / "inputs")
         .and(warp::post())
-        .and(input_json_body())
+        .and(input::CreateRequest::from_json_body())
         .and(with_mixers(mixers))
         .and_then(input::add)
 }
@@ -129,7 +100,7 @@ pub(crate) fn input_update(
 ) -> impl Filter<Extract = impl Reply, Error = warp::Rejection> + Clone {
     warp::path!("mixers" / String / "inputs" / String)
         .and(warp::put())
-        .and(input_update_json_body())
+        .and(input::UpdateRequest::from_json_body())
         .and(with_mixers(mixers))
         .and_then(input::update)
 }
@@ -166,7 +137,7 @@ pub(crate) fn output_add(
 ) -> impl Filter<Extract = impl Reply, Error = warp::Rejection> + Clone {
     warp::path!("mixers" / String / "outputs")
         .and(warp::post())
-        .and(output_json_body())
+        .and(output::CreateRequest::from_json_body())
         .and(with_mixers(mixers))
         .and_then(output::add)
 }

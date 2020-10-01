@@ -7,6 +7,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use warp::http::StatusCode;
 use warp::reply::Reply;
+use warp::Filter;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct CreateRequest {
@@ -17,10 +18,26 @@ pub struct CreateRequest {
     pub video: Option<mixer::VideoConfig>,
 }
 
+impl CreateRequest {
+    pub fn from_json_body() -> impl Filter<Extract = (Self,), Error = warp::Rejection> + Clone {
+        // When accepting a body, we want a JSON body
+        // (and to reject huge payloads)...
+        warp::body::content_length_limit(1024 * 16).and(warp::body::json())
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct UpdateRequest {
     pub audio: Option<mixer::AudioConfig>,
     pub video: Option<mixer::VideoConfig>,
+}
+
+impl UpdateRequest {
+    pub fn from_json_body() -> impl Filter<Extract = (Self,), Error = warp::Rejection> + Clone {
+        // When accepting a body, we want a JSON body
+        // (and to reject huge payloads)...
+        warp::body::content_length_limit(1024 * 16).and(warp::body::json())
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
