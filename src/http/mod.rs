@@ -359,10 +359,16 @@ mod tests {
             .mixer_create(config)
             .await
             .expect("failed to create mixer");
+
+        let input_config = mixer::Config {
+            name: "fakesrc".to_string(),
+            ..mixer::default_config()
+        };
+
         server
             .input_add(
                 mixer_name,
-                mixer::input::Fake::new("fakesrc").expect("failed to create fakesrc"),
+                mixer::input::Fake::new(input_config).expect("failed to create fakesrc"),
             )
             .await
             .expect("Failed to add input");
@@ -391,10 +397,16 @@ mod tests {
             .mixer_create(config)
             .await
             .expect("failed to create mixer");
+
+        let input_config = mixer::Config {
+            name: "fakesrc".to_string(),
+            ..mixer::default_config()
+        };
+
         server
             .input_add(
                 mixer_name,
-                mixer::input::Fake::new("fakesrc").expect("failed to create fakesrc"),
+                mixer::input::Fake::new(input_config).expect("failed to create fakesrc"),
             )
             .await
             .expect("Failed to add input");
