@@ -1,5 +1,7 @@
 use crate::http;
+use crate::input;
 use crate::mixer;
+use crate::output;
 use serde::Serialize;
 use std::convert::Infallible;
 use std::io::Write;
@@ -240,7 +242,7 @@ pub async fn input_get(
         return Ok(response);
     }
 
-    let input: Option<&mixer::Input> = mixer.unwrap().inputs.get(input_name.as_str());
+    let input: Option<&input::Input> = mixer.unwrap().inputs.get(input_name.as_str());
 
     if input.is_none() {
         let mut response = warp::reply::json(&Response {
@@ -282,7 +284,7 @@ pub async fn input_update(
         ));
     }
 
-    let input: Option<&mut mixer::Input> = mixer.unwrap().inputs.get_mut(input_name.as_str());
+    let input: Option<&mut input::Input> = mixer.unwrap().inputs.get_mut(input_name.as_str());
     if input.is_none() {
         return Ok(warp::reply::with_status(
             warp::reply::json(&Response {
@@ -493,7 +495,7 @@ pub async fn output_get(
         return Ok(response);
     }
 
-    let output: Option<&mixer::Output> = mixer.unwrap().outputs.get(output_name.as_str());
+    let output: Option<&output::Output> = mixer.unwrap().outputs.get(output_name.as_str());
 
     if output.is_none() {
         let mut response = warp::reply::json(&Response {

@@ -1,12 +1,10 @@
 mod error;
-pub mod input;
-pub mod output;
 
+pub use crate::input;
+pub use crate::output;
 use crate::Result;
 pub use error::Error;
 use gst::prelude::*;
-pub use input::Input;
-pub use output::Output;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -40,8 +38,8 @@ pub struct Mixer {
     pipeline: gst::Pipeline,
     audio_mixer: gst::Element,
     video_mixer: gst::Element,
-    pub inputs: HashMap<String, Input>,
-    pub outputs: HashMap<String, Output>,
+    pub inputs: HashMap<String, input::Input>,
+    pub outputs: HashMap<String, output::Output>,
     audio_out: gst::Element,
     video_out: gst::Element,
     join_handle: Option<std::thread::JoinHandle<()>>,
@@ -129,7 +127,7 @@ impl Mixer {
         self.inputs.len()
     }
 
-    pub fn input_add(&mut self, mut input: Input) -> Result<()> {
+    pub fn input_add(&mut self, mut input: input::Input) -> Result<()> {
         if self.inputs.contains_key(&input.name()) {
             return Err(Error::Exists("input".to_string(), input.name()));
         }
@@ -165,7 +163,7 @@ impl Mixer {
         self.outputs.len()
     }
 
-    pub fn output_add(&mut self, mut output: Output) -> Result<()> {
+    pub fn output_add(&mut self, mut output: output::Output) -> Result<()> {
         if self.outputs.contains_key(&output.name()) {
             return Err(Error::Exists("output".to_string(), output.name()));
         }

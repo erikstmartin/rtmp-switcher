@@ -1,7 +1,9 @@
 mod filters;
 mod handlers;
 
+use crate::input;
 use crate::mixer;
+use crate::output;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -112,11 +114,11 @@ impl Server {
         self.mixers.lock().await.mixer_create(config)
     }
 
-    pub async fn input_add(&mut self, mixer: &str, input: mixer::Input) -> Result<(), Error> {
+    pub async fn input_add(&mut self, mixer: &str, input: input::Input) -> Result<(), Error> {
         self.mixers.lock().await.input_add(mixer, input)
     }
 
-    pub async fn output_add(&mut self, mixer: &str, output: mixer::Output) -> Result<(), Error> {
+    pub async fn output_add(&mut self, mixer: &str, output: output::Output) -> Result<(), Error> {
         self.mixers.lock().await.output_add(mixer, output)
     }
 }
@@ -152,7 +154,7 @@ impl Mixers {
         Ok(())
     }
 
-    pub fn input_add(&mut self, mixer: &str, input: mixer::Input) -> Result<(), Error> {
+    pub fn input_add(&mut self, mixer: &str, input: input::Input) -> Result<(), Error> {
         match self.mixers.get_mut(mixer) {
             Some(m) => m.input_add(input).map_err(|e| Error::Mixer(e)),
             None => Err(Error::NotFound),
@@ -166,7 +168,7 @@ impl Mixers {
         Ok(())
     }
 
-    pub fn output_add(&mut self, mixer: &str, output: mixer::Output) -> Result<(), Error> {
+    pub fn output_add(&mut self, mixer: &str, output: output::Output) -> Result<(), Error> {
         match self.mixers.get_mut(mixer) {
             Some(m) => match m.output_add(output) {
                 Ok(_) => Ok(()),
