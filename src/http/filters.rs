@@ -1,4 +1,6 @@
-use super::handlers;
+use super::input;
+use super::mixer;
+use super::output;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use warp::*;
@@ -10,7 +12,7 @@ fn with_mixers(
 }
 
 fn mixer_json_body(
-) -> impl Filter<Extract = (super::MixerCreateRequest,), Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (mixer::CreateRequest,), Error = warp::Rejection> + Clone {
     // When accepting a body, we want a JSON body
     // (and to reject huge payloads)...
     warp::body::content_length_limit(1024 * 16).and(warp::body::json())
@@ -18,21 +20,21 @@ fn mixer_json_body(
 
 // TODO: Can we use generics so that we don't need to duplicate this?
 fn input_json_body(
-) -> impl Filter<Extract = (super::InputCreateRequest,), Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (input::CreateRequest,), Error = warp::Rejection> + Clone {
     // When accepting a body, we want a JSON body
     // (and to reject huge payloads)...
     warp::body::content_length_limit(1024 * 16).and(warp::body::json())
 }
 
 fn input_update_json_body(
-) -> impl Filter<Extract = (super::InputUpdateRequest,), Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (input::UpdateRequest,), Error = warp::Rejection> + Clone {
     // When accepting a body, we want a JSON body
     // (and to reject huge payloads)...
     warp::body::content_length_limit(1024 * 16).and(warp::body::json())
 }
 
 fn output_json_body(
-) -> impl Filter<Extract = (super::OutputCreateRequest,), Error = warp::Rejection> + Clone {
+) -> impl Filter<Extract = (output::CreateRequest,), Error = warp::Rejection> + Clone {
     // When accepting a body, we want a JSON body
     // (and to reject huge payloads)...
     warp::body::content_length_limit(1024 * 16).and(warp::body::json())
@@ -64,7 +66,7 @@ pub(crate) fn mixer_create(
         .and(warp::post())
         .and(mixer_json_body())
         .and(with_mixers(mixers))
-        .and_then(handlers::mixer_create)
+        .and_then(mixer::create)
 }
 
 pub(crate) fn mixer_list(
@@ -73,7 +75,7 @@ pub(crate) fn mixer_list(
     warp::path!("mixers")
         .and(warp::get())
         .and(with_mixers(mixers))
-        .and_then(handlers::mixer_list)
+        .and_then(mixer::list)
 }
 
 pub(crate) fn mixer_get(
@@ -82,7 +84,7 @@ pub(crate) fn mixer_get(
     warp::path!("mixers" / String)
         .and(warp::get())
         .and(with_mixers(mixers))
-        .and_then(handlers::mixer_get)
+        .and_then(mixer::get)
 }
 
 pub(crate) fn mixer_debug(
@@ -91,7 +93,7 @@ pub(crate) fn mixer_debug(
     warp::path!("mixers" / String / "debug")
         .and(warp::get())
         .and(with_mixers(mixers))
-        .and_then(handlers::mixer_debug)
+        .and_then(mixer::debug)
 }
 
 pub(crate) fn input_add(
@@ -101,7 +103,7 @@ pub(crate) fn input_add(
         .and(warp::post())
         .and(input_json_body())
         .and(with_mixers(mixers))
-        .and_then(handlers::input_add)
+        .and_then(input::add)
 }
 
 pub(crate) fn input_list(
@@ -110,7 +112,7 @@ pub(crate) fn input_list(
     warp::path!("mixers" / String / "inputs")
         .and(warp::get())
         .and(with_mixers(mixers))
-        .and_then(handlers::input_list)
+        .and_then(input::list)
 }
 
 pub(crate) fn input_get(
@@ -119,7 +121,7 @@ pub(crate) fn input_get(
     warp::path!("mixers" / String / "inputs" / String)
         .and(warp::get())
         .and(with_mixers(mixers))
-        .and_then(handlers::input_get)
+        .and_then(input::get)
 }
 
 pub(crate) fn input_update(
@@ -129,7 +131,7 @@ pub(crate) fn input_update(
         .and(warp::put())
         .and(input_update_json_body())
         .and(with_mixers(mixers))
-        .and_then(handlers::input_update)
+        .and_then(input::update)
 }
 
 pub(crate) fn input_remove(
@@ -138,7 +140,7 @@ pub(crate) fn input_remove(
     warp::path!("mixers" / String / "inputs" / String)
         .and(warp::delete())
         .and(with_mixers(mixers))
-        .and_then(handlers::input_remove)
+        .and_then(input::remove)
 }
 
 pub(crate) fn input_set_active(
@@ -147,7 +149,7 @@ pub(crate) fn input_set_active(
     warp::path!("mixers" / String / "set_active_input" / String)
         .and(warp::post())
         .and(with_mixers(mixers))
-        .and_then(handlers::input_set_active)
+        .and_then(input::set_active)
 }
 
 pub(crate) fn output_list(
@@ -156,7 +158,7 @@ pub(crate) fn output_list(
     warp::path!("mixers" / String / "outputs")
         .and(warp::get())
         .and(with_mixers(mixers))
-        .and_then(handlers::output_list)
+        .and_then(output::list)
 }
 
 pub(crate) fn output_add(
@@ -166,7 +168,7 @@ pub(crate) fn output_add(
         .and(warp::post())
         .and(output_json_body())
         .and(with_mixers(mixers))
-        .and_then(handlers::output_add)
+        .and_then(output::add)
 }
 
 pub(crate) fn output_get(
@@ -175,7 +177,7 @@ pub(crate) fn output_get(
     warp::path!("mixers" / String / "outputs" / String)
         .and(warp::get())
         .and(with_mixers(mixers))
-        .and_then(handlers::output_get)
+        .and_then(output::get)
 }
 
 pub(crate) fn output_remove(
@@ -184,5 +186,5 @@ pub(crate) fn output_remove(
     warp::path!("mixers" / String / "outputs" / String)
         .and(warp::delete())
         .and(with_mixers(mixers))
-        .and_then(handlers::output_remove)
+        .and_then(output::remove)
 }
