@@ -1,5 +1,5 @@
 use crate::mixer;
-use crate::output;
+use crate::output::Output as MixerOutput;
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use std::sync::Arc;
@@ -65,10 +65,12 @@ pub async fn add(
     mixers: Arc<Mutex<super::Mixers>>,
 ) -> Result<impl warp::Reply, Infallible> {
     let output = match output.output_type.as_str() {
-        "Auto" => crate::mixer::output::Auto::new(&output.name).map_err(|e| super::Error::Mixer(e)),
-        "RTMP" => crate::mixer::output::RTMP::new(&output.name, &output.location)
+        "Auto" => MixerOutput::create_auto(&output.name).map_err(|e| super::Error::Mixer(e)),
+        "RTMP" => MixerOutput::create_rtmp(&output.name, &output.location)
             .map_err(|e| super::Error::Mixer(e)),
-        "Fake" => crate::mixer::output::Fake::new(&output.name).map_err(|e| super::Error::Mixer(e)),
+        "Fake" => MixerOutput::create_fake(&output.name).map_err(|e| super::Error::Mixer(e)),
+        "File" => MixerOutput::create_file(&output.name, &output.location)
+            .map_err(|e| super::Error::Mixer(e)),
         _ => Err(super::Error::Unknown),
     };
 
@@ -113,7 +115,7 @@ pub async fn get(
         return Ok(response);
     }
 
-    let output: Option<&output::Output> = mixer.unwrap().outputs.get(output_name.as_str());
+    let output: Option<&MixerOutput> = mixer.unwrap().outputs.get(output_name.as_str());
 
     if output.is_none() {
         let mut response = warp::reply::json(&super::Response {

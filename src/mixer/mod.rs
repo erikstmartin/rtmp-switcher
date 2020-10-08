@@ -1,5 +1,6 @@
 mod error;
 
+use crate::gst_create_element;
 pub use crate::input;
 pub use crate::output;
 use crate::Result;
@@ -57,8 +58,14 @@ impl Mixer {
         let pipeline = gst::Pipeline::new(Some(config.name.as_str()));
 
         // Create Video Channel
-        let video_capsfilter = gst::ElementFactory::make("capsfilter", Some("video_capsfilter"))?;
-        let video_mixer = gst::ElementFactory::make("compositor", Some("videomixer"))?;
+        let video_capsfilter = gst_create_element(
+            "capsfilter",
+            format!("mixer_{}_video_capsfilter", config.name).as_str(),
+        )?;
+        let video_mixer = gst_create_element(
+            "compositor",
+            format!("mixer_{}_video_compositor", config.name).as_str(),
+        )?;
         let video_caps = gst::Caps::builder("video/x-raw")
             .field(
                 "framerate",
@@ -70,17 +77,30 @@ impl Mixer {
             .build();
         video_capsfilter.set_property("caps", &video_caps).unwrap();
 
-        let video_queue = gst::ElementFactory::make("queue", Some("videomixer_queue"))?;
-        let video_tee = gst::ElementFactory::make("tee", Some("videotee"))?;
+        let video_queue = gst_create_element(
+            "queue",
+            format!("mixer_{}_video_queue", config.name).as_str(),
+        )?;
+        let video_tee =
+            gst_create_element("tee", format!("mixer_{}_video_tee", config.name).as_str())?;
         video_tee.set_property("allow-not-linked", &true)?;
 
         pipeline.add_many(&[&video_mixer, &video_capsfilter, &video_queue, &video_tee])?;
         gst::Element::link_many(&[&video_mixer, &video_capsfilter, &video_queue, &video_tee])?;
 
-        let audio_mixer = gst::ElementFactory::make("audiomixer", Some("audiomixer"))?;
-        let volume = gst::ElementFactory::make("volume", Some("audio_volume"))?;
+        let audio_mixer = gst_create_element(
+            "audiomixer",
+            format!("mixer_{}_audio_mixer", config.name).as_str(),
+        )?;
+        let volume = gst_create_element(
+            "volume",
+            format!("mixer_{}_audio_volume", config.name).as_str(),
+        )?;
         volume.set_property("volume", &config.audio.volume.unwrap())?;
-        let audio_capsfilter = gst::ElementFactory::make("capsfilter", Some("audio_capsfilter"))?;
+        let audio_capsfilter = gst_create_element(
+            "capsfilter",
+            format!("mixer_{}_audio_capsfilter", config.name).as_str(),
+        )?;
         let audio_caps = gst::Caps::builder("audio/x-raw")
             .field("channels", &2)
             .field("layout", &"interleaved")
@@ -88,7 +108,8 @@ impl Mixer {
             .build();
         audio_capsfilter.set_property("caps", &audio_caps).unwrap();
 
-        let audio_tee = gst::ElementFactory::make("tee", Some("audiotee"))?;
+        let audio_tee =
+            gst_create_element("tee", format!("mixer_{}_audio_tee", config.name).as_str())?;
         audio_tee.set_property("allow-not-linked", &true)?;
 
         pipeline.add_many(&[&audio_mixer, &volume, &audio_capsfilter, &audio_tee])?;
@@ -106,12 +127,14 @@ impl Mixer {
             video_out: video_tee,
         };
 
-        let config = Config {
+        let config = input::Config {
             name: "background".to_string(),
             audio: AudioConfig { volume: Some(0.0) },
             video: config.video.clone(),
+            record: false,
         };
-        let mut background = input::Test::new(config)?;
+
+        let mut background = input::Input::create_test(config)?;
         if background_enabled {
             background.link(
                 mixer.pipeline.clone(),

@@ -11,16 +11,16 @@ pub struct Fake {
 }
 
 impl Fake {
-    pub fn new(name: &str) -> Result<super::Output> {
-        let audio = gst_create_element("fakesink", format!("output_{}_audio_sink", name).as_str())?;
-        let video = gst_create_element("fakesink", format!("output_{}_video_sink", name).as_str())?;
+    pub fn create(name: &str) -> Result<Self> {
+        let audio = gst_create_element("fakesink", &format!("output_{}_audio_sink", name))?;
+        let video = gst_create_element("fakesink", &format!("output_{}_video_sink", name))?;
 
-        Ok(super::Output::Fake(Fake {
+        Ok(Fake {
             name: name.to_string(),
             pipeline: None,
             audio,
             video,
-        }))
+        })
     }
 
     pub fn name(&self) -> String {

@@ -18,7 +18,7 @@ pub struct Auto {
 }
 
 impl Auto {
-    pub fn new(name: &str) -> Result<super::Output> {
+    pub fn create(name: &str) -> Result<Self> {
         let videoqueue =
             gst_create_element("queue", format!("output_{}_video_queue", name).as_str())?;
         let video_convert = gst_create_element(
@@ -57,7 +57,7 @@ impl Auto {
             format!("output_{}_audio_sink", name).as_str(),
         )?;
 
-        Ok(super::Output::Auto(Self {
+        Ok(Self {
             name: name.to_string(),
             pipeline: None,
             audioqueue,
@@ -69,7 +69,7 @@ impl Auto {
             video_capsfilter,
             videosink_queue,
             videosink,
-        }))
+        })
     }
 
     pub fn name(&self) -> String {

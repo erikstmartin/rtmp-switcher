@@ -6,11 +6,21 @@ use crate::mixer;
 use crate::Result;
 
 pub use fake::Fake;
+use mixer::{AudioConfig, VideoConfig};
+use serde::{Deserialize, Serialize};
 pub use test::Test;
 pub use uri::URI;
 
 use gst::prelude::*;
 use gstreamer as gst;
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct Config {
+    pub name: String,
+    pub video: VideoConfig,
+    pub audio: AudioConfig,
+    pub record: bool,
+}
 
 pub enum Input {
     URI(URI),
@@ -19,8 +29,16 @@ pub enum Input {
 }
 
 impl Input {
-    pub fn from_uri(config: mixer::Config, uri: &str) -> Input {
-        uri::URI::new(config, uri).unwrap()
+    pub fn create_uri(config: Config, uri: &str) -> Result<Input> {
+        URI::create(config, uri).map(Self::URI)
+    }
+
+    pub fn create_test(config: Config) -> Result<Self> {
+        Test::create(config).map(Self::Test)
+    }
+
+    pub fn create_fake(config: Config) -> Result<Self> {
+        Fake::create(config).map(Self::Fake)
     }
 
     pub fn name(&self) -> String {
@@ -132,7 +150,7 @@ impl Input {
         }
     }
 
-    pub fn config(&self) -> mixer::Config {
+    pub fn config(&self) -> Config {
         match self {
             Input::URI(input) => input.config(),
             Input::Test(input) => input.config(),

@@ -1,11 +1,13 @@
 pub mod auto;
 pub mod fake;
+pub mod file;
 pub mod rtmp;
 
 use crate::Result;
 
 pub use auto::Auto;
 pub use fake::Fake;
+pub use file::File;
 use gst::prelude::*;
 use gstreamer as gst;
 pub use rtmp::RTMP;
@@ -14,14 +16,32 @@ pub enum Output {
     RTMP(RTMP),
     Auto(Auto),
     Fake(Fake),
+    File(File),
 }
 
 impl Output {
+    pub fn create_rtmp(name: &str, location: &str) -> Result<Self> {
+        RTMP::create(name, location).map(Self::RTMP)
+    }
+
+    pub fn create_auto(name: &str) -> Result<Self> {
+        Auto::create(name).map(Self::Auto)
+    }
+
+    pub fn create_fake(name: &str) -> Result<Self> {
+        Fake::create(name).map(Self::Fake)
+    }
+
+    pub fn create_file(name: &str, location: &str) -> Result<Self> {
+        File::create(name, location).map(Self::File)
+    }
+
     pub fn name(&self) -> String {
         match self {
             Output::RTMP(output) => output.name(),
             Output::Auto(output) => output.name(),
             Output::Fake(output) => output.name(),
+            Output::File(output) => output.name(),
         }
     }
 
@@ -30,6 +50,7 @@ impl Output {
             Output::RTMP(_) => "RTMP".to_string(),
             Output::Auto(_) => "Auto".to_string(),
             Output::Fake(_) => "Fake".to_string(),
+            Output::File(_) => "File".to_string(),
         }
     }
 
@@ -38,6 +59,7 @@ impl Output {
             Output::RTMP(output) => output.location.clone(),
             Output::Auto(_) => "".to_string(),
             Output::Fake(_) => "".to_string(),
+            Output::File(_) => "".to_string(),
         }
     }
 
@@ -51,6 +73,7 @@ impl Output {
             Output::RTMP(output) => output.link(pipeline, audio, video),
             Output::Auto(output) => output.link(pipeline, audio, video),
             Output::Fake(output) => output.link(pipeline, audio, video),
+            Output::File(output) => output.link(pipeline, audio, video),
         }
     }
 
@@ -59,6 +82,7 @@ impl Output {
             Output::RTMP(output) => output.unlink(),
             Output::Auto(output) => output.unlink(),
             Output::Fake(output) => output.unlink(),
+            Output::File(output) => output.unlink(),
         }
     }
 
@@ -67,6 +91,7 @@ impl Output {
             Output::RTMP(output) => output.set_state(state),
             Output::Auto(output) => output.set_state(state),
             Output::Fake(output) => output.set_state(state),
+            Output::File(output) => output.set_state(state),
         }
     }
 }

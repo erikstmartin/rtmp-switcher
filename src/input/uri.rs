@@ -1,5 +1,7 @@
+use super::Config;
 use crate::gst_create_element;
 use crate::mixer;
+use crate::output::File as FileOutput;
 use crate::Result;
 
 use gst::prelude::*;
@@ -8,77 +10,82 @@ use gstreamer as gst;
 pub struct URI {
     pub name: String,
     pub location: String,
-    config: mixer::Config,
+    config: Config,
     pipeline: Option<gst::Pipeline>,
     source: gst::Element,
+    audio_tee: gst::Element,
+    audio_tee_queue: gst::Element,
     audio_convert: gst::Element,
     audio_resample: gst::Element,
     audio_volume: gst::Element,
     audio_queue: gst::Element,
+    video_tee: gst::Element,
+    video_tee_queue: gst::Element,
     video_convert: gst::Element,
     video_scale: gst::Element,
     video_rate: gst::Element,
     video_capsfilter: gst::Element,
     video_queue: gst::Element,
+    record_output: Option<FileOutput>,
 }
 
 impl URI {
-    pub fn new(config: mixer::Config, uri: &str) -> Result<super::Input> {
+    pub fn create(config: Config, uri: &str) -> Result<Self> {
         let source = gst_create_element(
             "uridecodebin",
-            format!("input_{}_uridecodebin", config.name).as_str(),
+            &format!("input_{}_uridecodebin", config.name),
         )?;
         source.set_property("uri", &uri)?;
 
+        let video_tee_queue =
+            gst_create_element("queue2", &format!("input_{}_video_tee_queue", config.name))?;
+        let video_tee = gst_create_element("tee", &format!("input_{}_video_tee", config.name))?;
+        video_tee.set_property("allow-not-linked", &true)?;
+
         let video_convert = gst_create_element(
             "videoconvert",
-            format!("input_{}_video_convert", config.name).as_str(),
+            &format!("input_{}_video_convert", config.name),
         )?;
-        let video_scale = gst_create_element(
-            "videoscale",
-            format!("input_{}_video_scale", config.name).as_str(),
-        )?;
-        let video_rate = gst_create_element(
-            "videorate",
-            format!("input_{}_video_rate", config.name).as_str(),
-        )?;
+        let video_scale =
+            gst_create_element("videoscale", &format!("input_{}_video_scale", config.name))?;
+        let video_rate =
+            gst_create_element("videorate", &format!("input_{}_video_rate", config.name))?;
         let video_caps = gst::Caps::builder("video/x-raw")
             .field(
                 "framerate",
                 &gst::Fraction::new(config.video.framerate.unwrap(), 1),
             )
-            .field("format", &config.video.format.clone().unwrap().as_str())
+            .field("format", &config.video.format.clone().unwrap())
             .field("width", &config.video.width.unwrap())
             .field("height", &config.video.height.unwrap())
             .build();
         let video_capsfilter = gst_create_element(
             "capsfilter",
-            format!("input_{}_video_capsfilter", config.name).as_str(),
+            &format!("input_{}_video_capsfilter", config.name),
         )?;
         video_capsfilter.set_property("caps", &video_caps).unwrap();
 
-        let video_queue = gst_create_element(
-            "queue2",
-            format!("input_{}_video_queue", config.name).as_str(),
-        )?;
+        let video_queue =
+            gst_create_element("queue2", &format!("input_{}_video_queue", config.name))?;
 
-        let audio_queue = gst_create_element(
-            "queue",
-            format!("input_{}_audio_queue", config.name).as_str(),
-        )?;
+        let audio_tee_queue =
+            gst_create_element("queue2", &format!("input_{}_audio_tee_queue", config.name))?;
+        let audio_tee = gst_create_element("tee", &format!("input_{}_audio_tee", config.name))?;
+        audio_tee.set_property("allow-not-linked", &true)?;
+
+        let audio_queue =
+            gst_create_element("queue", &format!("input_{}_audio_queue", config.name))?;
         let audio_convert = gst_create_element(
             "audioconvert",
-            format!("input_{}_audio_convert", config.name).as_str(),
+            &format!("input_{}_audio_convert", config.name),
         )?;
         let audio_resample = gst_create_element(
             "audioresample",
-            format!("input_{}_audio_resample", config.name).as_str(),
+            &format!("input_{}_audio_resample", config.name),
         )?;
 
-        let audio_volume = gst_create_element(
-            "volume",
-            format!("input_{}_audio_volume", config.name).as_str(),
-        )?;
+        let audio_volume =
+            gst_create_element("volume", &format!("input_{}_audio_volume", config.name))?;
         audio_volume.set_property("volume", &config.audio.volume.unwrap())?;
 
         let audio = audio_convert.clone();
@@ -171,22 +178,36 @@ impl URI {
             }
         });
 
-        Ok(super::Input::URI(Self {
+        let record_output = match config.record {
+            true => Some(FileOutput::create(
+                &format!("record_{}", config.name),
+                &format!("./recordings/input_{}.mkv", config.name),
+            )?),
+
+            false => None,
+        };
+
+        Ok(Self {
             name: config.name.to_string(),
             location: config.name.to_string(),
             config,
             pipeline: None,
             source,
+            audio_tee,
+            audio_tee_queue,
             audio_convert,
             audio_volume,
             audio_resample,
             audio_queue,
+            video_tee,
+            video_tee_queue,
             video_convert,
             video_scale,
             video_rate,
             video_capsfilter,
             video_queue,
-        }))
+            record_output,
+        })
     }
 
     pub fn name(&self) -> String {
@@ -199,6 +220,21 @@ impl URI {
         audio: gst::Element,
         video: gst::Element,
     ) -> Result<()> {
+        pipeline.add_many(&[
+            &self.audio_tee_queue,
+            &self.audio_tee,
+            &self.video_tee_queue,
+            &self.video_tee,
+        ])?;
+
+        if let Some(record_output) = self.record_output.as_mut() {
+            record_output.link(
+                pipeline.clone(),
+                self.audio_tee.clone(),
+                self.video_tee.clone(),
+            )?;
+        }
+
         pipeline.add_many(&[
             &self.source,
             &self.audio_convert,
@@ -218,6 +254,8 @@ impl URI {
             &self.audio_convert,
             &self.audio_volume,
             &self.audio_resample,
+            &self.audio_tee_queue,
+            &self.audio_tee,
             &self.audio_queue,
             &audio,
         ])?;
@@ -226,6 +264,8 @@ impl URI {
             &self.video_scale,
             &self.video_rate,
             &self.video_capsfilter,
+            &self.video_tee_queue,
+            &self.video_tee,
             &self.video_queue,
             &video,
         ])?;
@@ -250,10 +290,14 @@ impl URI {
 
         self.pipeline.as_ref().unwrap().remove_many(&[
             &self.source,
+            &self.audio_tee,
+            &self.audio_tee_queue,
             &self.audio_convert,
             &self.audio_volume,
             &self.audio_resample,
             &self.audio_queue,
+            &self.video_tee,
+            &self.video_tee_queue,
             &self.video_convert,
             &self.video_scale,
             &self.video_rate,
@@ -350,7 +394,7 @@ impl URI {
         Ok(())
     }
 
-    pub fn config(&self) -> mixer::Config {
+    pub fn config(&self) -> Config {
         self.config.clone()
     }
 }

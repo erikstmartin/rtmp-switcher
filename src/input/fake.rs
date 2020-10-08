@@ -1,5 +1,5 @@
+use super::Config;
 use crate::gst_create_element;
-use crate::mixer;
 use crate::Result;
 
 use gst::prelude::*;
@@ -8,32 +8,26 @@ use gstreamer as gst;
 pub struct Fake {
     pub name: String,
     pipeline: Option<gst::Pipeline>,
-    config: mixer::Config,
+    config: Config,
     audio: gst::Element,
     video: gst::Element,
 }
 
 impl Fake {
-    pub fn new(config: mixer::Config) -> Result<super::Input> {
-        let audio = gst_create_element(
-            "fakesrc",
-            format!("input_{}_audio_src", config.name).as_str(),
-        )?;
+    pub fn create(config: Config) -> Result<Self> {
+        let audio = gst_create_element("fakesrc", &format!("input_{}_audio_src", config.name))?;
         audio.set_property("is-live", &true)?;
 
-        let video = gst_create_element(
-            "fakesrc",
-            format!("input_{}_video_src", config.name).as_str(),
-        )?;
+        let video = gst_create_element("fakesrc", &format!("input_{}_video_src", config.name))?;
         video.set_property("is-live", &true)?;
 
-        Ok(super::Input::Fake(Fake {
+        Ok(Fake {
             name: config.name.to_string(),
             pipeline: None,
             config,
             audio,
             video,
-        }))
+        })
     }
 
     pub fn name(&self) -> String {
@@ -106,7 +100,7 @@ impl Fake {
         Ok(())
     }
 
-    pub fn config(&self) -> mixer::Config {
+    pub fn config(&self) -> Config {
         self.config.clone()
     }
 }

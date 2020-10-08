@@ -291,6 +291,7 @@ mod tests {
                 location: "http://nowhere".to_string(),
                 video: Some(mixer::default_video_config()),
                 audio: Some(mixer::default_audio_config()),
+                record: Some(false),
             })
             .reply(&api)
             .await;
@@ -323,15 +324,17 @@ mod tests {
             .await
             .expect("failed to create mixer");
 
-        let input_config = MixerConfig {
+        let input_config = crate::input::Config {
             name: "fakesrc".to_string(),
-            ..mixer::default_config()
+            audio: mixer::default_audio_config(),
+            video: mixer::default_video_config(),
+            record: false,
         };
 
         server
             .input_add(
                 mixer_name,
-                mixer::input::Fake::new(input_config).expect("failed to create fakesrc"),
+                mixer::input::Input::create_fake(input_config).expect("failed to create fakesrc"),
             )
             .await
             .expect("Failed to add input");
@@ -361,15 +364,17 @@ mod tests {
             .await
             .expect("failed to create mixer");
 
-        let input_config = MixerConfig {
+        let input_config = crate::input::Config {
             name: "fakesrc".to_string(),
-            ..mixer::default_config()
+            audio: mixer::default_audio_config(),
+            video: mixer::default_video_config(),
+            record: false,
         };
 
         server
             .input_add(
                 mixer_name,
-                mixer::input::Fake::new(input_config).expect("failed to create fakesrc"),
+                mixer::input::Input::create_fake(input_config).expect("failed to create fakesrc"),
             )
             .await
             .expect("Failed to add input");
@@ -474,7 +479,7 @@ mod tests {
         server
             .output_add(
                 mixer_name,
-                mixer::output::Fake::new("fake").expect("failed to create fake output"),
+                mixer::output::Output::create_fake("fake").expect("failed to create fake output"),
             )
             .await
             .expect("Failed to add output");
@@ -506,7 +511,7 @@ mod tests {
         server
             .output_add(
                 mixer_name,
-                mixer::output::Fake::new("fake").expect("failed to create fake output"),
+                mixer::output::Output::create_fake("fake").expect("failed to create fake output"),
             )
             .await
             .expect("Failed to add output");

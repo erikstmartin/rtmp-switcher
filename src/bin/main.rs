@@ -35,8 +35,6 @@ async fn main() -> eyre::Result<()> {
     gst::init().map_err(RTMPSwitcherError::FailedInitGstreamer)?;
 
     let server = Server::new_with_config(addr);
-
-    // let fut = warp::run(); tokio::select! { fut => {}, timeout => {}, signal => {} }
     server.run().await;
 
     Ok(())

@@ -1,4 +1,5 @@
-use crate::input;
+use crate::input::Config as InputConfig;
+use crate::input::Input as MixerInput;
 use crate::mixer;
 
 use serde::{Deserialize, Serialize};
@@ -16,6 +17,7 @@ pub struct CreateRequest {
     pub location: String,
     pub audio: Option<mixer::AudioConfig>,
     pub video: Option<mixer::VideoConfig>,
+    pub record: Option<bool>,
 }
 
 impl CreateRequest {
@@ -65,17 +67,19 @@ pub async fn add(
     }
     let mixer_config = mixer_config.unwrap();
 
-    let config = mixer::Config {
+    let config = InputConfig {
         name: input.name.clone(),
         video: input.video.unwrap_or(mixer_config.video),
         audio: input.audio.unwrap_or(mixer_config.audio),
+        record: input.record.unwrap_or(false),
     };
 
     let input = match input.input_type.as_str() {
-        "URI" => crate::mixer::input::URI::new(config, &input.location)
-            .map_err(|e| super::Error::Mixer(e)),
-        "Fake" => crate::mixer::input::Fake::new(config).map_err(|e| super::Error::Mixer(e)),
-        "Test" => crate::mixer::input::Test::new(config).map_err(|e| super::Error::Mixer(e)),
+        "URI" => {
+            MixerInput::create_uri(config, &input.location).map_err(|e| super::Error::Mixer(e))
+        }
+        "Fake" => MixerInput::create_fake(config).map_err(|e| super::Error::Mixer(e)),
+        "Test" => MixerInput::create_test(config).map_err(|e| super::Error::Mixer(e)),
         _ => Err(super::Error::Unknown),
     };
 
@@ -158,7 +162,7 @@ pub async fn get(
         return Ok(response);
     }
 
-    let input: Option<&input::Input> = mixer.unwrap().inputs.get(input_name.as_str());
+    let input: Option<&MixerInput> = mixer.unwrap().inputs.get(input_name.as_str());
 
     if input.is_none() {
         let mut response = warp::reply::json(&super::Response {
@@ -200,7 +204,7 @@ pub async fn update(
         ));
     }
 
-    let input: Option<&mut input::Input> = mixer.unwrap().inputs.get_mut(input_name.as_str());
+    let input: Option<&mut MixerInput> = mixer.unwrap().inputs.get_mut(input_name.as_str());
     if input.is_none() {
         return Ok(warp::reply::with_status(
             warp::reply::json(&super::Response {

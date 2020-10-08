@@ -1,5 +1,5 @@
+use super::Config;
 use crate::gst_create_element;
-use crate::mixer;
 use crate::Result;
 
 use gst::prelude::*;
@@ -8,7 +8,7 @@ use gstreamer as gst;
 pub struct Test {
     pub name: String,
     pipeline: Option<gst::Pipeline>,
-    config: mixer::Config,
+    config: Config,
     audio: gst::Element,
     audio_convert: gst::Element,
     audio_resample: gst::Element,
@@ -22,29 +22,25 @@ pub struct Test {
 
 impl Test {
     // TODO: Change element names to use name from config
-    pub fn new(config: mixer::Config) -> Result<super::Input> {
+    pub fn create(config: Config) -> Result<Self> {
         let video = gst_create_element(
             "videotestsrc",
-            format!("input_{}_videotestsrc", config.name).as_str(),
+            &format!("input_{}_videotestsrc", config.name),
         )?;
         video.set_property_from_str("pattern", "black");
         video.set_property("is-live", &true)?;
 
         let video_convert = gst_create_element(
             "videoconvert",
-            format!("input_{}_video_convert", config.name).as_str(),
+            &format!("input_{}_video_convert", config.name),
         )?;
-        let video_scale = gst_create_element(
-            "videoscale",
-            format!("input_{}_video_scale", config.name).as_str(),
-        )?;
-        let video_rate = gst_create_element(
-            "videorate",
-            format!("input_{}_video_rate", config.name).as_str(),
-        )?;
+        let video_scale =
+            gst_create_element("videoscale", &format!("input_{}_video_scale", config.name))?;
+        let video_rate =
+            gst_create_element("videorate", &format!("input_{}_video_rate", config.name))?;
         let video_capsfilter = gst_create_element(
             "capsfilter",
-            format!("input_{}_video_capsfilter", config.name).as_str(),
+            &format!("input_{}_video_capsfilter", config.name),
         )?;
         let video_caps = gst::Caps::builder("video/x-raw")
             .field(
@@ -53,30 +49,28 @@ impl Test {
             )
             .field("width", &config.video.width.unwrap())
             .field("height", &config.video.height.unwrap())
-            .field("format", &config.video.format.clone().unwrap().as_str())
+            .field("format", &config.video.format.clone().unwrap())
             .build();
         video_capsfilter.set_property("caps", &video_caps).unwrap();
 
         let audio = gst_create_element(
             "audiotestsrc",
-            format!("input_{}_audiotestsrc", config.name).as_str(),
+            &format!("input_{}_audiotestsrc", config.name),
         )?;
         audio.set_property("volume", &config.audio.volume.unwrap())?;
         audio.set_property("is-live", &true)?;
-        let audio_queue = gst_create_element(
-            "queue",
-            format!("input_{}_audio_queue", config.name).as_str(),
-        )?;
+        let audio_queue =
+            gst_create_element("queue", &format!("input_{}_audio_queue", config.name))?;
         let audio_convert = gst_create_element(
             "audioconvert",
-            format!("input_{}_audio_convert", config.name).as_str(),
+            &format!("input_{}_audio_convert", config.name),
         )?;
         let audio_resample = gst_create_element(
             "audioresample",
-            format!("input_{}_audio_resample", config.name).as_str(),
+            &format!("input_{}_audio_resample", config.name),
         )?;
 
-        Ok(super::Input::Test(Test {
+        Ok(Test {
             name: config.name.clone(),
             pipeline: None,
             config,
@@ -89,7 +83,7 @@ impl Test {
             video_rate,
             video_scale,
             video_capsfilter,
-        }))
+        })
     }
 
     pub fn name(&self) -> String {
@@ -203,7 +197,7 @@ impl Test {
         Ok(())
     }
 
-    pub fn config(&self) -> mixer::Config {
+    pub fn config(&self) -> Config {
         self.config.clone()
     }
 }

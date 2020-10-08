@@ -3,7 +3,7 @@ use crate::Result;
 use gst::prelude::*;
 use gstreamer as gst;
 
-pub struct RTMP {
+pub struct File {
     pub name: String,
     pub location: String,
     pipeline: Option<gst::Pipeline>,
@@ -14,8 +14,8 @@ pub struct RTMP {
     video_capsfilter: gst::Element,
     x264enc: gst::Element,
     h264parse: gst::Element,
-    flvqueue: gst::Element,
-    flvmux: gst::Element,
+    mkvqueue: gst::Element,
+    mkvmux: gst::Element,
     queue_sink: gst::Element,
     video_sink: gst::Element,
 
@@ -25,8 +25,8 @@ pub struct RTMP {
     audioenc: gst::Element,
 }
 
-impl RTMP {
-    pub fn create(name: &str, uri: &str) -> Result<Self> {
+impl File {
+    pub fn create(name: &str, location: &str) -> Result<Self> {
         // Video stream
         let video_queue = gst_create_element("queue", &format!("output_{}_video_queue", name))?;
 
@@ -49,13 +49,14 @@ impl RTMP {
         let h264parse =
             gst_create_element("h264parse", &format!("output_{}_video_h264parse", name))?;
 
-        let flvqueue = gst_create_element("queue", &format!("output_{}_video_flvqueue", name))?;
-        let flvmux = gst_create_element("flvmux", &format!("output_{}_video_flvmux", name))?;
-        flvmux.set_property_from_str("streamable", "true");
+        let mkvqueue = gst_create_element("queue", &format!("output_{}_video_mkvqueue", name))?;
+        let mkvmux = gst_create_element("matroskamux", &format!("output_{}_video_mkvmux", name))?;
+        mkvmux.set_property_from_str("streamable", "true");
 
         let queue_sink = gst_create_element("queue", &format!("output_{}_rtmp_queuesink", name))?;
-        let video_sink = gst_create_element("rtmpsink", &format!("output_{}_rtmp_sink", name))?;
-        video_sink.set_property("location", &uri)?;
+        let video_sink = gst_create_element("filesink", &format!("output_{}_file_sink", name))?;
+        // TODO: Configure recording directory, also use timestamp
+        video_sink.set_property("location", &location)?;
 
         // Audio stream
         let audio_queue = gst_create_element("queue", &format!("output_{}_audio_queue", name))?;
@@ -68,7 +69,7 @@ impl RTMP {
 
         Ok(Self {
             name: name.to_string(),
-            location: uri.to_string(),
+            location: location.to_string(),
             pipeline: None,
             video_queue,
             video_convert,
@@ -77,8 +78,8 @@ impl RTMP {
             video_capsfilter,
             x264enc,
             h264parse,
-            flvqueue,
-            flvmux,
+            mkvqueue,
+            mkvmux,
             queue_sink,
             video_sink,
             audio_queue,
@@ -107,8 +108,8 @@ impl RTMP {
             &self.video_capsfilter,
             &self.x264enc,
             &self.h264parse,
-            &self.flvqueue,
-            &self.flvmux,
+            &self.mkvqueue,
+            &self.mkvmux,
             &self.queue_sink,
             &self.video_sink,
         ])?;
@@ -122,8 +123,8 @@ impl RTMP {
             &self.video_capsfilter,
             &self.x264enc,
             &self.h264parse,
-            &self.flvqueue,
-            &self.flvmux,
+            &self.mkvqueue,
+            &self.mkvmux,
             &self.queue_sink,
             &self.video_sink,
         ])?;
@@ -142,7 +143,7 @@ impl RTMP {
             &self.audio_convert,
             &self.audio_resample,
             &self.audioenc,
-            &self.flvmux,
+            &self.mkvmux,
         ])?;
 
         self.pipeline = Some(pipeline);
@@ -163,8 +164,8 @@ impl RTMP {
             &self.video_capsfilter,
             &self.x264enc,
             &self.h264parse,
-            &self.flvqueue,
-            &self.flvmux,
+            &self.mkvqueue,
+            &self.mkvmux,
             &self.queue_sink,
             &self.video_sink,
         ])?;
@@ -187,8 +188,8 @@ impl RTMP {
         self.video_capsfilter.set_state(state)?;
         self.x264enc.set_state(state)?;
         self.h264parse.set_state(state)?;
-        self.flvqueue.set_state(state)?;
-        self.flvmux.set_state(state)?;
+        self.mkvqueue.set_state(state)?;
+        self.mkvmux.set_state(state)?;
         self.queue_sink.set_state(state)?;
         self.video_sink.set_state(state)?;
 
