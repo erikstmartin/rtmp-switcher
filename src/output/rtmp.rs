@@ -1,3 +1,5 @@
+use crate::gst_create_element;
+use crate::mixer::Error;
 use crate::Result;
 use gst::prelude::*;
 use gstreamer as gst;
@@ -28,20 +30,23 @@ impl RTMP {
     pub fn new(name: &str, uri: &str) -> Result<super::Output> {
         // Video stream
         let video_queue =
-            gst::ElementFactory::make("queue", Some(format!("{}_video_queue", name).as_str()))?;
+            gst_create_element("queue", format!("output_{}_video_queue", name).as_str())?;
 
-        let video_convert = gst::ElementFactory::make(
+        let video_convert = gst_create_element(
             "videoconvert",
-            Some(format!("{}_videoconvert", name).as_str()),
+            format!("output_{}_video_convert", name).as_str(),
         )?;
-        let video_scale =
-            gst::ElementFactory::make("videoscale", Some(format!("{}_videoscale", name).as_str()))?;
+        let video_scale = gst_create_element(
+            "videoscale",
+            format!("output_{}_video_scale", name).as_str(),
+        )?;
         let video_rate =
-            gst::ElementFactory::make("videorate", Some(format!("{}_videorate", name).as_str()))?;
-        let video_capsfilter = gst::ElementFactory::make(
+            gst_create_element("videorate", format!("output_{}_video_rate", name).as_str())?;
+        let video_capsfilter = gst_create_element(
             "capsfilter",
-            Some(format!("{}_video_capsfilter", name).as_str()),
+            format!("output_{}_video_capsfilter", name).as_str(),
         )?;
+
         let video_caps = gst::Caps::builder("video/x-raw")
             .field("framerate", &gst::Fraction::new(30, 1))
             .field("format", &"I420")
@@ -49,34 +54,42 @@ impl RTMP {
             .build();
         video_capsfilter.set_property("caps", &video_caps).unwrap();
 
-        let x264enc =
-            gst::ElementFactory::make("nvh264enc", Some(format!("{}_x264enc", name).as_str()))?;
-        let h264parse =
-            gst::ElementFactory::make("h264parse", Some(format!("{}_h264parse", name).as_str()))?;
+        let x264enc = gst_create_element(
+            "nvh264enc",
+            format!("output_{}_video_x264enc", name).as_str(),
+        )?;
+        let h264parse = gst_create_element(
+            "h264parse",
+            format!("output_{}_video_h264parse", name).as_str(),
+        )?;
 
-        let flvqueue = gst::ElementFactory::make("queue", Some(format!("{}_flv", name).as_str()))?;
+        let flvqueue =
+            gst_create_element("queue", format!("output_{}_video_flvqueue", name).as_str())?;
         let flvmux =
-            gst::ElementFactory::make("flvmux", Some(format!("{}_flvmux", name).as_str()))?;
+            gst_create_element("flvmux", format!("output_{}_video_flvmux", name).as_str())?;
         flvmux.set_property_from_str("streamable", "true");
+
         let queue_sink =
-            gst::ElementFactory::make("queue", Some(format!("{}_queuesink", name).as_str()))?;
+            gst_create_element("queue", format!("output_{}_rtmp_queuesink", name).as_str())?;
         let video_sink =
-            gst::ElementFactory::make("rtmpsink", Some(format!("{}_video_sink", name).as_str()))?;
+            gst_create_element("rtmpsink", format!("output_{}_rtmp_sink", name).as_str())?;
         video_sink.set_property("location", &uri)?;
 
         // Audio stream
         let audio_queue =
-            gst::ElementFactory::make("queue", Some(format!("{}_audio_queue", name).as_str()))?;
-        let audio_convert = gst::ElementFactory::make(
+            gst_create_element("queue", format!("output_{}_audio_queue", name).as_str())?;
+        let audio_convert = gst_create_element(
             "audioconvert",
-            Some(format!("{}_audioconvert", name).as_str()),
+            format!("output_{}_audio_convert", name).as_str(),
         )?;
-        let audio_resample = gst::ElementFactory::make(
+        let audio_resample = gst_create_element(
             "audioresample",
-            Some(format!("{}_audioresample", name).as_str()),
+            format!("output_{}_audio_resample", name).as_str(),
         )?;
-        let audioenc =
-            gst::ElementFactory::make("fdkaacenc", Some(format!("{}_fdkaacenc", name).as_str()))?;
+        let audioenc = gst_create_element(
+            "fdkaacenc",
+            format!("output_{}_audio_fdkaacenc", name).as_str(),
+        )?;
 
         Ok(super::Output::RTMP(Self {
             name: name.to_string(),

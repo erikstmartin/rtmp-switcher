@@ -1,3 +1,4 @@
+use crate::gst_create_element;
 use crate::Result;
 use gst::prelude::*;
 use gstreamer as gst;
@@ -11,11 +12,8 @@ pub struct Fake {
 
 impl Fake {
     pub fn new(name: &str) -> Result<super::Output> {
-        let audio =
-            gst::ElementFactory::make("fakesink", Some(format!("{}_audio_sink", name).as_str()))?;
-
-        let video =
-            gst::ElementFactory::make("fakesink", Some(format!("{}_video_sink", name).as_str()))?;
+        let audio = gst_create_element("fakesink", format!("output_{}_audio_sink", name).as_str())?;
+        let video = gst_create_element("fakesink", format!("output_{}_video_sink", name).as_str())?;
 
         Ok(super::Output::Fake(Fake {
             name: name.to_string(),

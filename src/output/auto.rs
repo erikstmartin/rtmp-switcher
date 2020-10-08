@@ -1,3 +1,4 @@
+use crate::gst_create_element;
 use crate::Result;
 use gst::prelude::*;
 use gstreamer as gst;
@@ -19,35 +20,49 @@ pub struct Auto {
 impl Auto {
     pub fn new(name: &str) -> Result<super::Output> {
         let videoqueue =
-            gst::ElementFactory::make("queue", Some(format!("{}_video_queue", name).as_str()))?;
+            gst_create_element("queue", format!("output_{}_video_queue", name).as_str())?;
         let video_convert = gst::ElementFactory::make(
             "videoconvert",
-            Some(format!("{}_videoconvert", name).as_str()),
+            Some(format!("output_{}_videoconvert", name).as_str()),
         )?;
-        let video_scale =
-            gst::ElementFactory::make("videoscale", Some(format!("{}_videoscale", name).as_str()))?;
+        let video_convert = gst_create_element(
+            "videoconvert",
+            format!("output_{}_video_convert", name).as_str(),
+        )?;
+        let video_scale = gst_create_element(
+            "videoscale",
+            format!("output_{}_video_scale", name).as_str(),
+        )?;
         let video_rate =
-            gst::ElementFactory::make("videorate", Some(format!("{}_videorate", name).as_str()))?;
-        let video_capsfilter = gst::ElementFactory::make(
+            gst_create_element("videorate", format!("output_{}_video_rate", name).as_str())?;
+        let video_capsfilter = gst_create_element(
             "capsfilter",
-            Some(format!("{}_video_capsfilter", name).as_str()),
+            format!("output_{}_video_capsfilter", name).as_str(),
         )?;
+
         let video_caps = gst::Caps::builder("video/x-raw")
             .field("framerate", &gst::Fraction::new(30, 1))
+            .field("format", &"I420")
+            .field("profile", &"high")
             .build();
         video_capsfilter.set_property("caps", &video_caps).unwrap();
+
+        let videosink_queue = gst::ElementFactory::make(
+            "queue",
+            Some(format!("output_{}_videosink_queue", name).as_str()),
+        )?;
         let videosink_queue =
-            gst::ElementFactory::make("queue", Some(format!("{}_videosink_queue", name).as_str()))?;
-        let videosink = gst::ElementFactory::make(
+            gst_create_element("queue", format!("output_{}_videosink_queue", name).as_str())?;
+        let videosink = gst_create_element(
             "autovideosink",
-            Some(format!("{}_video_sink", name).as_str()),
+            format!("output_{}_video_sink", name).as_str(),
         )?;
 
         let audioqueue =
-            gst::ElementFactory::make("queue", Some(format!("{}_audio_queue", name).as_str()))?;
-        let audiosink = gst::ElementFactory::make(
+            gst_create_element("queue", format!("output_{}_audio_queue", name).as_str())?;
+        let audiosink = gst_create_element(
             "autoaudiosink",
-            Some(format!("{}_audio_sink", name).as_str()),
+            format!("output_{}_audio_sink", name).as_str(),
         )?;
 
         Ok(super::Output::Auto(Self {

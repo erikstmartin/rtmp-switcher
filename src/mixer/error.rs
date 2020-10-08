@@ -14,4 +14,7 @@ pub enum Error {
 
     #[error("An error was returned from gstreamer: '{0}'")]
     GstStateChange(#[from] gst::StateChangeError),
+
+    #[error("An error was returned from gstreamer: '{0}'")]
+    Gstreamer(String),
 }

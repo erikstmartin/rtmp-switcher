@@ -1,3 +1,4 @@
+use crate::gst_create_element;
 use crate::mixer;
 use crate::Result;
 
@@ -14,15 +15,15 @@ pub struct Fake {
 
 impl Fake {
     pub fn new(config: mixer::Config) -> Result<super::Input> {
-        let audio = gst::ElementFactory::make(
+        let audio = gst_create_element(
             "fakesrc",
-            Some(format!("{}_audio_source", config.name).as_str()),
+            format!("input_{}_audio_src", config.name).as_str(),
         )?;
         audio.set_property("is-live", &true)?;
 
-        let video = gst::ElementFactory::make(
+        let video = gst_create_element(
             "fakesrc",
-            Some(format!("{}_video_source", config.name).as_str()),
+            format!("input_{}_video_src", config.name).as_str(),
         )?;
         video.set_property("is-live", &true)?;
 
