@@ -1,5 +1,4 @@
 use crate::gst_create_element;
-use crate::mixer::Error;
 use crate::Result;
 use gst::prelude::*;
 use gstreamer as gst;

@@ -212,32 +212,81 @@ pub async fn update(
 
     let input = input.unwrap();
     if let Some(volume) = request.audio.unwrap().volume {
-        input.set_volume(volume);
+        if input.set_volume(volume).is_err() {
+            return Ok(warp::reply::with_status(
+                warp::reply::json(&super::Response {
+                    message: "set_volume failed".to_string(),
+                }),
+                StatusCode::OK,
+            ));
+        }
     }
 
     let video_config = request.video.unwrap();
     if let Some(zorder) = video_config.zorder {
-        input.set_zorder(zorder);
+        if input.set_zorder(zorder).is_err() {
+            return Ok(warp::reply::with_status(
+                warp::reply::json(&super::Response {
+                    message: "set_zorder failed".to_string(),
+                }),
+                StatusCode::OK,
+            ));
+        }
     }
 
     if let Some(width) = video_config.width {
-        input.set_width(width);
+        if input.set_width(width).is_err() {
+            return Ok(warp::reply::with_status(
+                warp::reply::json(&super::Response {
+                    message: "set_zorder failed".to_string(),
+                }),
+                StatusCode::OK,
+            ));
+        }
     }
 
     if let Some(height) = video_config.height {
-        input.set_height(height);
+        if input.set_height(height).is_err() {
+            return Ok(warp::reply::with_status(
+                warp::reply::json(&super::Response {
+                    message: "set_height failed".to_string(),
+                }),
+                StatusCode::OK,
+            ));
+        }
     }
 
     if let Some(xpos) = video_config.xpos {
-        input.set_xpos(xpos);
+        if input.set_xpos(xpos).is_err() {
+            return Ok(warp::reply::with_status(
+                warp::reply::json(&super::Response {
+                    message: "set_xpos failed".to_string(),
+                }),
+                StatusCode::OK,
+            ));
+        }
     }
 
     if let Some(ypos) = video_config.ypos {
-        input.set_ypos(ypos);
+        if input.set_ypos(ypos).is_err() {
+            return Ok(warp::reply::with_status(
+                warp::reply::json(&super::Response {
+                    message: "set_ypos failed".to_string(),
+                }),
+                StatusCode::OK,
+            ));
+        }
     }
 
     if let Some(alpha) = video_config.alpha {
-        input.set_alpha(alpha);
+        if input.set_alpha(alpha).is_err() {
+            return Ok(warp::reply::with_status(
+                warp::reply::json(&super::Response {
+                    message: "set_alpha failed".to_string(),
+                }),
+                StatusCode::OK,
+            ));
+        }
     }
 
     Ok(warp::reply::with_status(

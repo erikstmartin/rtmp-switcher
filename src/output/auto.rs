@@ -21,10 +21,6 @@ impl Auto {
     pub fn new(name: &str) -> Result<super::Output> {
         let videoqueue =
             gst_create_element("queue", format!("output_{}_video_queue", name).as_str())?;
-        let video_convert = gst::ElementFactory::make(
-            "videoconvert",
-            Some(format!("output_{}_videoconvert", name).as_str()),
-        )?;
         let video_convert = gst_create_element(
             "videoconvert",
             format!("output_{}_video_convert", name).as_str(),
@@ -47,10 +43,6 @@ impl Auto {
             .build();
         video_capsfilter.set_property("caps", &video_caps).unwrap();
 
-        let videosink_queue = gst::ElementFactory::make(
-            "queue",
-            Some(format!("output_{}_videosink_queue", name).as_str()),
-        )?;
         let videosink_queue =
             gst_create_element("queue", format!("output_{}_videosink_queue", name).as_str())?;
         let videosink = gst_create_element(

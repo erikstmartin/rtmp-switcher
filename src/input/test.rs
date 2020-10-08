@@ -183,24 +183,24 @@ impl Test {
         Ok(())
     }
 
-    pub fn set_width(&mut self, width: i32) -> Result<()> {
-        todo!()
+    pub fn set_width(&mut self, _width: i32) -> Result<()> {
+        Ok(())
     }
 
-    pub fn set_height(&mut self, height: i32) -> Result<()> {
-        todo!()
+    pub fn set_height(&mut self, _height: i32) -> Result<()> {
+        Ok(())
     }
 
-    pub fn set_xpos(&mut self, xpos: i32) -> Result<()> {
-        todo!()
+    pub fn set_xpos(&mut self, _xpos: i32) -> Result<()> {
+        Ok(())
     }
 
-    pub fn set_ypos(&mut self, ypos: i32) -> Result<()> {
-        todo!()
+    pub fn set_ypos(&mut self, _ypos: i32) -> Result<()> {
+        Ok(())
     }
 
-    pub fn set_alpha(&mut self, ypos: f64) -> Result<()> {
-        todo!()
+    pub fn set_alpha(&mut self, _alpha: f64) -> Result<()> {
+        Ok(())
     }
 
     pub fn config(&self) -> mixer::Config {
