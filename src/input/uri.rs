@@ -178,10 +178,15 @@ impl URI {
             }
         });
 
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+
         let record_output = match config.record {
             true => Some(FileOutput::create(
                 &format!("record_{}", config.name),
-                &format!("./recordings/input_{}.mkv", config.name),
+                &format!("./recordings/input_{}_{}.mkv", config.name, timestamp),
             )?),
 
             false => None,
