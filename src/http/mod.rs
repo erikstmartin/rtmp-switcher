@@ -3,19 +3,25 @@ pub mod input;
 pub mod mixer;
 pub mod output;
 
-use crate::input::Input;
-use crate::mixer::Config as MixerConfig;
-use crate::mixer::Error as MixerError;
-use crate::mixer::Mixer;
-use crate::output::Output;
-
+use crate::{
+    input::Input,
+    mixer::{Config as MixerConfig, Error as MixerError, Mixer},
+    output::Output,
+};
 use regex::Regex;
 use serde::Serialize;
-use std::collections::HashMap;
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
-use std::sync::Arc;
+use std::{
+    collections::HashMap,
+    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
+    sync::Arc,
+};
 use thiserror::Error;
 use tokio::sync::Mutex;
+use warp::{
+    http::StatusCode,
+    reject::{self, Reject},
+    reply, Rejection, Reply,
+};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -31,8 +37,57 @@ pub enum Error {
     #[error("name is invalid")]
     InvalidName,
 
-    #[error("An error was returned from the mixer: '{0}'")]
+    #[error("MixerError: '{0}'")]
     Mixer(#[from] MixerError),
+}
+impl Reject for Error {}
+
+type JsonResult = Result<reply::WithStatus<reply::Json>, Rejection>;
+
+pub fn error(error: Error) -> JsonResult {
+    Err(reject::custom(error))
+}
+
+pub fn okay<T>(item: T) -> JsonResult
+where
+    T: Serialize,
+{
+    Ok(reply::with_status(reply::json(&item), StatusCode::OK))
+}
+
+pub fn message_response(message: &str, status: StatusCode) -> JsonResult {
+    Ok(reply::with_status(
+        reply::json(&Response {
+            message: message.to_string(),
+        }),
+        status,
+    ))
+}
+
+pub async fn recover(err: Rejection) -> Result<impl Reply, Rejection> {
+    if let Some(error) = err.find::<Error>() {
+        return Ok(reply::with_status(
+            reply::json(&Response {
+                message: format!("{}", error),
+            }),
+            match error {
+                Error::Exists => StatusCode::BAD_REQUEST,
+                Error::InvalidName => StatusCode::BAD_REQUEST,
+                Error::Unknown => StatusCode::INTERNAL_SERVER_ERROR,
+                Error::NotFound => StatusCode::NOT_FOUND,
+                Error::Mixer(e) => match e {
+                    MixerError::Exists(_, _) => StatusCode::BAD_REQUEST,
+                    MixerError::Unknown => StatusCode::INTERNAL_SERVER_ERROR,
+                    MixerError::NotFound(_, _) => StatusCode::NOT_FOUND,
+                    MixerError::GstBool(_)
+                    | MixerError::GstStateChange(_)
+                    | MixerError::Gstreamer(_) => StatusCode::INTERNAL_SERVER_ERROR,
+                },
+            },
+        ));
+    }
+
+    Err(err)
 }
 
 #[derive(Debug, Serialize)]

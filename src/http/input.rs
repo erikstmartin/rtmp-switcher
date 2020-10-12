@@ -1,15 +1,14 @@
-use crate::input::Config as InputConfig;
-use crate::input::Input as MixerInput;
+use super::{error, message_response, okay, Error, JsonResult};
+use crate::input::{Config as InputConfig, Input as MixerInput};
 use crate::mixer;
 
 use serde::{Deserialize, Serialize};
-use std::convert::Infallible;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use warp::http::StatusCode;
-use warp::reply::Reply;
-use warp::Filter;
+use warp::{http::StatusCode, Filter};
 
+/// HTTP Request for creating a new [`input::Input`](../input/struct.Input.html)
+/// to be used by the [`mixer`](../mixer/struct.Mixer.html).
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct CreateRequest {
     pub name: String,
@@ -21,6 +20,8 @@ pub struct CreateRequest {
 }
 
 impl CreateRequest {
+    /// Constructs a new `CreateRequest` from a json body.
+    /// This function consumes the http request body through warp::body::json().
     pub fn from_json_body() -> impl Filter<Extract = (Self,), Error = warp::Rejection> + Clone {
         // When accepting a body, we want a JSON body
         // (and to reject huge payloads)...
@@ -28,6 +29,8 @@ impl CreateRequest {
     }
 }
 
+/// HTTP Request for update a [`input::Input`](../input/struct.Input.html)
+/// to be used by the [`mixer`](../mixer/struct.Mixer.html).
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct UpdateRequest {
     pub audio: Option<mixer::AudioConfig>,
@@ -35,6 +38,8 @@ pub struct UpdateRequest {
 }
 
 impl UpdateRequest {
+    /// Constructs a new `UpdateRequest` from a json body.
+    /// This function consumes the http request body through warp::body::json().
     pub fn from_json_body() -> impl Filter<Extract = (Self,), Error = warp::Rejection> + Clone {
         // When accepting a body, we want a JSON body
         // (and to reject huge payloads)...
@@ -42,6 +47,7 @@ impl UpdateRequest {
     }
 }
 
+/// HTTP Response for a [`input::Input`](../input/struct.Input.html)
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Input {
     pub name: String,
@@ -49,23 +55,20 @@ pub struct Input {
     pub location: String,
 }
 
+/// HTTP Handler for creating an [`input::Input`](../input/struct.Input.html)
+/// It will add the resulting input to the [`mixer`](../mixer/struct.Mixer.html) which will
+/// link the new input to the Gstreamer pipeline.
+#[tracing::instrument(skip(mixers))]
 pub async fn add(
     mixer_name: String,
     input: CreateRequest,
     mixers: Arc<Mutex<super::Mixers>>,
-) -> Result<impl warp::Reply, Infallible> {
+) -> JsonResult {
     let mut mixers = mixers.lock().await;
-    let mixer_config = mixers.mixer_config(&mixer_name);
-
-    if mixer_config.is_err() {
-        return Ok(warp::reply::with_status(
-            warp::reply::json(&super::Response {
-                message: "Mixer not found".to_string(),
-            }),
-            StatusCode::NOT_FOUND,
-        ));
-    }
-    let mixer_config = mixer_config.unwrap();
+    let mixer_config = match mixers.mixer_config(&mixer_name) {
+        Err(e) => return error(e),
+        Ok(c) => c,
+    };
 
     let config = InputConfig {
         name: input.name.clone(),
@@ -75,65 +78,34 @@ pub async fn add(
     };
 
     let input = match input.input_type.as_str() {
-        "URI" => {
-            MixerInput::create_uri(config, &input.location).map_err(|e| super::Error::Mixer(e))
-        }
-        "Fake" => MixerInput::create_fake(config).map_err(|e| super::Error::Mixer(e)),
-        "Test" => MixerInput::create_test(config).map_err(|e| super::Error::Mixer(e)),
+        "URI" => MixerInput::create_uri(config, &input.location).map_err(super::Error::Mixer),
+        "Fake" => MixerInput::create_fake(config).map_err(super::Error::Mixer),
+        "Test" => MixerInput::create_test(config).map_err(super::Error::Mixer),
         _ => Err(super::Error::Unknown),
     };
 
-    if let Err(err) = input {
-        return Ok(warp::reply::with_status(
-            warp::reply::json(&super::Response {
-                message: format!("{}", err),
-            }),
-            StatusCode::INTERNAL_SERVER_ERROR,
-        ));
-    }
+    let input = match input {
+        Err(e) => return error(e),
+        Ok(i) => i,
+    };
 
-    match mixers.input_add(&mixer_name, input.unwrap()) {
-        Ok(_) => Ok(warp::reply::with_status(
-            warp::reply::json(&super::Response {
-                message: "Input created".to_string(),
-            }),
-            StatusCode::CREATED,
-        )),
-        Err(e) => match e {
-            super::Error::NotFound => Ok(warp::reply::with_status(
-                warp::reply::json(&super::Response {
-                    message: "Mixer not found".to_string(),
-                }),
-                StatusCode::NOT_FOUND,
-            )),
-            _ => Ok(warp::reply::with_status(
-                warp::reply::json(&super::Response {
-                    message: format!("{}", e),
-                }),
-                StatusCode::INTERNAL_SERVER_ERROR,
-            )),
-        },
+    match mixers.input_add(&mixer_name, input) {
+        Ok(_) => message_response("Input created.", StatusCode::CREATED),
+        Err(e) => error(e),
     }
 }
 
-pub async fn list(
-    mixer_name: String,
-    mixers: Arc<Mutex<super::Mixers>>,
-) -> Result<warp::reply::Response, Infallible> {
+/// HTTP Handler for listing [`input::Input`](../input/struct.Input.html)'s associated with
+/// a given mixer.
+#[tracing::instrument(skip(mixers))]
+pub async fn list(mixer_name: String, mixers: Arc<Mutex<super::Mixers>>) -> JsonResult {
     let mixers = mixers.lock().await;
-    let mixer = mixers.mixers.get(&mixer_name);
-    if mixer.is_none() {
-        let mut response = warp::reply::json(&super::Response {
-            message: "Mixer not found".to_string(),
-        })
-        .into_response();
-        *response.status_mut() = StatusCode::NOT_FOUND;
-
-        return Ok(response);
-    }
+    let mixer = match mixers.mixers.get(&mixer_name) {
+        None => return error(Error::NotFound),
+        Some(mixer) => mixer,
+    };
 
     let inputs: Vec<Input> = mixer
-        .unwrap()
         .inputs
         .iter()
         .map(|(_, input)| Input {
@@ -142,241 +114,147 @@ pub async fn list(
             location: input.location(),
         })
         .collect();
-    Ok(warp::reply::json(&inputs).into_response())
+    okay(&inputs)
 }
 
+/// HTTP Handler for retrieving an [`input::Input`](../input/struct.Input.html) associated with
+/// a given mixer.
+#[tracing::instrument(skip(mixers))]
 pub async fn get(
     mixer_name: String,
     input_name: String,
     mixers: Arc<Mutex<super::Mixers>>,
-) -> Result<warp::reply::Response, Infallible> {
+) -> JsonResult {
     let mixers = mixers.lock().await;
-    let mixer = mixers.mixers.get(&mixer_name);
-    if mixer.is_none() {
-        let mut response = warp::reply::json(&super::Response {
-            message: "Mixer not found".to_string(),
-        })
-        .into_response();
-        *response.status_mut() = StatusCode::NOT_FOUND;
+    let mixer = match mixers.mixers.get(&mixer_name) {
+        None => return error(Error::NotFound),
+        Some(mixer) => mixer,
+    };
 
-        return Ok(response);
-    }
+    let input = match mixer.inputs.get(input_name.as_str()) {
+        None => return error(Error::NotFound),
+        Some(input) => input,
+    };
 
-    let input: Option<&MixerInput> = mixer.unwrap().inputs.get(input_name.as_str());
-
-    if input.is_none() {
-        let mut response = warp::reply::json(&super::Response {
-            message: "Input not found".to_string(),
-        })
-        .into_response();
-        *response.status_mut() = StatusCode::NOT_FOUND;
-
-        return Ok(response);
-    }
-
-    let input = input.unwrap();
     let input = Input {
         name: input.name(),
         input_type: input.input_type(),
         location: input.location(),
     };
 
-    let mut response = warp::reply::json(&input).into_response();
-    *response.status_mut() = StatusCode::OK;
-
-    Ok(response)
+    okay(&input)
 }
 
+/// HTTP Handler for updating an [`input::Input`](../input/struct.Input.html) associated with
+/// a given mixer.
+#[tracing::instrument(skip(mixers))]
 pub async fn update(
     mixer_name: String,
     input_name: String,
     request: UpdateRequest,
     mixers: Arc<Mutex<super::Mixers>>,
-) -> Result<impl warp::Reply, Infallible> {
+) -> JsonResult {
     let mut mixers = mixers.lock().await;
-    let mixer = mixers.mixers.get_mut(&mixer_name);
-    if mixer.is_none() {
-        return Ok(warp::reply::with_status(
-            warp::reply::json(&super::Response {
-                message: "Mixer not found".to_string(),
-            }),
-            StatusCode::NOT_FOUND,
-        ));
-    }
+    let mixer = match mixers.mixers.get_mut(&mixer_name) {
+        Some(mixer) => mixer,
+        None => return error(Error::NotFound),
+    };
 
-    let input: Option<&mut MixerInput> = mixer.unwrap().inputs.get_mut(input_name.as_str());
-    if input.is_none() {
-        return Ok(warp::reply::with_status(
-            warp::reply::json(&super::Response {
-                message: "Input not found".to_string(),
-            }),
-            StatusCode::OK,
-        ));
-    }
+    let input = match mixer.inputs.get_mut(input_name.as_str()) {
+        Some(input) => input,
+        None => return error(Error::NotFound),
+    };
 
-    let input = input.unwrap();
-    if let Some(volume) = request.audio.unwrap().volume {
+    if let Some(volume) = request.audio.as_ref().and_then(|a| a.volume) {
         if input.set_volume(volume).is_err() {
-            return Ok(warp::reply::with_status(
-                warp::reply::json(&super::Response {
-                    message: "set_volume failed".to_string(),
-                }),
-                StatusCode::OK,
-            ));
+            return message_response("set_volume failed", StatusCode::INTERNAL_SERVER_ERROR);
         }
     }
 
-    let video_config = request.video.unwrap();
-    if let Some(zorder) = video_config.zorder {
+    if let Some(zorder) = request.video.as_ref().and_then(|v| v.zorder) {
         if input.set_zorder(zorder).is_err() {
-            return Ok(warp::reply::with_status(
-                warp::reply::json(&super::Response {
-                    message: "set_zorder failed".to_string(),
-                }),
-                StatusCode::OK,
-            ));
+            return message_response("set_zorder failed", StatusCode::INTERNAL_SERVER_ERROR);
         }
     }
 
-    if let Some(width) = video_config.width {
+    if let Some(width) = request.video.as_ref().and_then(|v| v.width) {
         if input.set_width(width).is_err() {
-            return Ok(warp::reply::with_status(
-                warp::reply::json(&super::Response {
-                    message: "set_zorder failed".to_string(),
-                }),
-                StatusCode::OK,
-            ));
+            return message_response("set_width failed", StatusCode::INTERNAL_SERVER_ERROR);
         }
     }
 
-    if let Some(height) = video_config.height {
+    if let Some(height) = request.video.as_ref().and_then(|v| v.height) {
         if input.set_height(height).is_err() {
-            return Ok(warp::reply::with_status(
-                warp::reply::json(&super::Response {
-                    message: "set_height failed".to_string(),
-                }),
-                StatusCode::OK,
-            ));
+            return message_response("set_height failed", StatusCode::INTERNAL_SERVER_ERROR);
         }
     }
 
-    if let Some(xpos) = video_config.xpos {
+    if let Some(xpos) = request.video.as_ref().and_then(|v| v.xpos) {
         if input.set_xpos(xpos).is_err() {
-            return Ok(warp::reply::with_status(
-                warp::reply::json(&super::Response {
-                    message: "set_xpos failed".to_string(),
-                }),
-                StatusCode::OK,
-            ));
+            return message_response("set_xpos failed", StatusCode::INTERNAL_SERVER_ERROR);
         }
     }
 
-    if let Some(ypos) = video_config.ypos {
+    if let Some(ypos) = request.video.as_ref().and_then(|v| v.ypos) {
         if input.set_ypos(ypos).is_err() {
-            return Ok(warp::reply::with_status(
-                warp::reply::json(&super::Response {
-                    message: "set_ypos failed".to_string(),
-                }),
-                StatusCode::OK,
-            ));
+            return message_response("set_ypos failed", StatusCode::INTERNAL_SERVER_ERROR);
         }
     }
 
-    if let Some(alpha) = video_config.alpha {
+    if let Some(alpha) = request.video.as_ref().and_then(|v| v.alpha) {
         if input.set_alpha(alpha).is_err() {
-            return Ok(warp::reply::with_status(
-                warp::reply::json(&super::Response {
-                    message: "set_alpha failed".to_string(),
-                }),
-                StatusCode::OK,
-            ));
+            return message_response("set_alpha failed", StatusCode::INTERNAL_SERVER_ERROR);
         }
     }
 
-    Ok(warp::reply::with_status(
-        warp::reply::json(&super::Response {
-            message: "Input updated".to_string(),
-        }),
-        StatusCode::OK,
-    ))
+    message_response("Input updated", StatusCode::OK)
 }
 
+/// HTTP Handler for removing an [`input::Input`](../input/struct.Input.html) from the associated
+/// mixer.
+#[tracing::instrument(skip(mixers))]
 pub async fn remove(
     mixer_name: String,
     input_name: String,
     mixers: Arc<Mutex<super::Mixers>>,
-) -> Result<impl warp::Reply, Infallible> {
+) -> JsonResult {
     let mut mixers = mixers.lock().await;
-    let mixer = mixers.mixers.get_mut(&mixer_name);
-    if mixer.is_none() {
-        return Ok(warp::reply::with_status(
-            warp::reply::json(&super::Response {
-                message: "Mixer not found".to_string(),
-            }),
-            StatusCode::NOT_FOUND,
-        ));
-    }
+    let mixer = match mixers.mixers.get_mut(&mixer_name) {
+        None => return error(Error::NotFound),
+        Some(mixer) => mixer,
+    };
 
-    match mixer.unwrap().input_remove(&input_name) {
-        Ok(_) => Ok(warp::reply::with_status(
-            warp::reply::json(&super::Response {
-                message: "Input removed".to_string(),
-            }),
-            StatusCode::OK,
-        )),
-        Err(e) => match e {
-            mixer::Error::NotFound(_, _) => Ok(warp::reply::with_status(
-                warp::reply::json(&super::Response {
-                    message: format!("{}", e),
-                }),
-                StatusCode::NOT_FOUND,
-            )),
-            e => Ok(warp::reply::with_status(
-                warp::reply::json(&super::Response {
-                    message: format!("{}", e),
-                }),
-                StatusCode::INTERNAL_SERVER_ERROR,
-            )),
-        },
+    match mixer.input_remove(&input_name) {
+        Ok(_) => message_response("Input removed", StatusCode::OK),
+        Err(e) => error(Error::Mixer(e)),
     }
 }
 
+/// HTTP Handler for setting an [`input::Input`](../input/struct.Input.html) to be the active
+/// input.
+///
+/// This will change the zorder of all other inputs to be lower than this input, it will then
+/// adjust the volume of all other inputs to 0.
+///
+/// Setting an input to active will reset all its configuration to its prior configuration (if it
+/// had been updated prior, due to another input being set active)
+#[tracing::instrument(skip(mixers))]
 pub async fn set_active(
     mixer_name: String,
     input_name: String,
     mixers: Arc<Mutex<super::Mixers>>,
-) -> Result<impl warp::Reply, Infallible> {
+) -> JsonResult {
     let mut mixers = mixers.lock().await;
-    let mixer = mixers.mixers.get_mut(&mixer_name);
-    if mixer.is_none() {
-        return Ok(warp::reply::with_status(
-            warp::reply::json(&super::Response {
-                message: "Mixer not found".to_string(),
-            }),
-            StatusCode::NOT_FOUND,
-        ));
-    }
+    let mixer = match mixers.mixers.get_mut(&mixer_name) {
+        None => return error(Error::NotFound),
+        Some(mixer) => mixer,
+    };
 
-    match mixer.unwrap().input_set_active(&input_name) {
-        Ok(_) => Ok(warp::reply::with_status(
-            warp::reply::json(&super::Response {
-                message: "Input set to active".to_string(),
-            }),
+    match mixer.input_set_active(&input_name) {
+        Ok(_) => message_response(
+            &format!("Input '{}' set to active", input_name),
             StatusCode::OK,
-        )),
-        Err(e) => match e {
-            mixer::Error::NotFound(_, _) => Ok(warp::reply::with_status(
-                warp::reply::json(&super::Response {
-                    message: format!("{}", e),
-                }),
-                StatusCode::NOT_FOUND,
-            )),
-            e => Ok(warp::reply::with_status(
-                warp::reply::json(&super::Response {
-                    message: format!("{}", e),
-                }),
-                StatusCode::INTERNAL_SERVER_ERROR,
-            )),
-        },
+        ),
+        Err(e) => error(Error::Mixer(e)),
     }
 }
