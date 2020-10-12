@@ -1,7 +1,7 @@
 use super::Config;
 use crate::gst_create_element;
 use crate::mixer;
-use crate::output::File as FileOutput;
+use crate::output::{Config as OutputConfig, File as FileOutput};
 use crate::Result;
 
 use gst::prelude::*;
@@ -51,13 +51,10 @@ impl URI {
         let video_rate =
             gst_create_element("videorate", &format!("input_{}_video_rate", config.name))?;
         let video_caps = gst::Caps::builder("video/x-raw")
-            .field(
-                "framerate",
-                &gst::Fraction::new(config.video.framerate.unwrap(), 1),
-            )
-            .field("format", &config.video.format.clone().unwrap())
-            .field("width", &config.video.width.unwrap())
-            .field("height", &config.video.height.unwrap())
+            .field("framerate", &gst::Fraction::new(config.video.framerate, 1))
+            .field("format", &config.video.format.to_string())
+            .field("width", &config.video.width)
+            .field("height", &config.video.height)
             .field("colorimetry", &"sRGB")
             .build();
         let video_capsfilter = gst_create_element(
@@ -87,7 +84,7 @@ impl URI {
 
         let audio_volume =
             gst_create_element("volume", &format!("input_{}_audio_volume", config.name))?;
-        audio_volume.set_property("volume", &config.audio.volume.unwrap())?;
+        audio_volume.set_property("volume", &config.audio.volume)?;
 
         let audio = audio_convert.clone();
         let video = video_convert.clone();
@@ -148,26 +145,13 @@ impl URI {
                 if queue_pad.is_linked() {
                     let compositor_pad = queue_pad.get_peer().unwrap();
 
-                    // Look at config
                     if let Some(zorder) = video_config.zorder {
                         let _ = compositor_pad.set_property("zorder", &zorder);
                     }
-
-                    if let Some(alpha) = video_config.alpha {
-                        let _ = compositor_pad.set_property("alpha", &alpha);
-                    }
-
-                    if let Some(xpos) = video_config.xpos {
-                        let _ = compositor_pad.set_property("xpos", &xpos);
-                    }
-
-                    if let Some(ypos) = video_config.ypos {
-                        let _ = compositor_pad.set_property("ypos", &ypos);
-                    }
-
-                    if let Some(repeat) = video_config.repeat {
-                        let _ = compositor_pad.set_property("repeat-after-eos", &repeat);
-                    }
+                    let _ = compositor_pad.set_property("alpha", &video_config.alpha);
+                    let _ = compositor_pad.set_property("xpos", &video_config.xpos);
+                    let _ = compositor_pad.set_property("ypos", &video_config.ypos);
+                    let _ = compositor_pad.set_property("repeat-after-eos", &video_config.repeat);
                 }
 
                 let res = src_pad.link(&sink_pad);
@@ -184,9 +168,15 @@ impl URI {
             .unwrap()
             .as_millis();
 
+        let recording_config = OutputConfig {
+            name: format!("record_{}", config.name),
+            audio: config.audio.clone(),
+            video: config.video.clone(),
+        };
+
         let record_output = match config.record {
             true => Some(FileOutput::create(
-                &format!("record_{}", config.name),
+                recording_config,
                 &format!("./recordings/input_{}_{}.mkv", config.name, timestamp),
             )?),
 
@@ -329,7 +319,7 @@ impl URI {
     }
 
     pub fn set_volume(&mut self, volume: f64) -> Result<()> {
-        self.config.audio.volume = Some(volume);
+        self.config.audio.volume = volume;
         self.audio_volume.set_property("volume", &volume)?;
         Ok(())
     }
@@ -346,7 +336,7 @@ impl URI {
     }
 
     pub fn set_width(&mut self, width: i32) -> Result<()> {
-        self.config.video.width = Some(width);
+        self.config.video.width = width;
         super::set_peer_pad_property(
             &self.video_queue.get_static_pad("src").unwrap(),
             "width",
@@ -357,7 +347,7 @@ impl URI {
     }
 
     pub fn set_height(&mut self, height: i32) -> Result<()> {
-        self.config.video.height = Some(height);
+        self.config.video.height = height;
         super::set_peer_pad_property(
             &self.video_queue.get_static_pad("src").unwrap(),
             "height",
@@ -368,7 +358,7 @@ impl URI {
     }
 
     pub fn set_xpos(&mut self, xpos: i32) -> Result<()> {
-        self.config.video.xpos = Some(xpos);
+        self.config.video.xpos = xpos;
         super::set_peer_pad_property(
             &self.video_queue.get_static_pad("src").unwrap(),
             "xpos",
@@ -379,7 +369,7 @@ impl URI {
     }
 
     pub fn set_ypos(&mut self, ypos: i32) -> Result<()> {
-        self.config.video.ypos = Some(ypos);
+        self.config.video.ypos = ypos;
         super::set_peer_pad_property(
             &self.video_queue.get_static_pad("src").unwrap(),
             "ypos",
@@ -390,7 +380,7 @@ impl URI {
     }
 
     pub fn set_alpha(&mut self, alpha: f64) -> Result<()> {
-        self.config.video.alpha = Some(alpha);
+        self.config.video.alpha = alpha;
         super::set_peer_pad_property(
             &self.video_queue.get_static_pad("src").unwrap(),
             "alpha",

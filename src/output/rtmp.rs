@@ -1,3 +1,4 @@
+use super::Config;
 use crate::gst_create_element;
 use crate::Result;
 use gst::prelude::*;
@@ -26,7 +27,9 @@ pub struct RTMP {
 }
 
 impl RTMP {
-    pub fn create(name: &str, uri: &str) -> Result<Self> {
+    pub fn create(config: Config, uri: &str) -> Result<Self> {
+        let name = &config.name;
+
         // Video stream
         let video_queue = gst_create_element("queue", &format!("output_{}_video_queue", name))?;
 

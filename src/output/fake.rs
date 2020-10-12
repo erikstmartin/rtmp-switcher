@@ -1,3 +1,4 @@
+use super::Config;
 use crate::gst_create_element;
 use crate::Result;
 use gst::prelude::*;
@@ -11,7 +12,8 @@ pub struct Fake {
 }
 
 impl Fake {
-    pub fn create(name: &str) -> Result<Self> {
+    pub fn create(config: Config) -> Result<Self> {
+        let name = &config.name;
         let audio = gst_create_element("fakesink", &format!("output_{}_audio_sink", name))?;
         let video = gst_create_element("fakesink", &format!("output_{}_video_sink", name))?;
 

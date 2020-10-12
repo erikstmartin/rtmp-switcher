@@ -12,8 +12,10 @@ use warp::Filter;
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct CreateRequest {
     pub name: String,
-    pub video: Option<mixer::VideoConfig>,
-    pub audio: Option<mixer::AudioConfig>,
+    #[serde(default)]
+    pub video: mixer::VideoConfig,
+    #[serde(default)]
+    pub audio: mixer::AudioConfig,
 }
 
 impl CreateRequest {
@@ -37,8 +39,8 @@ pub async fn create(
 ) -> Result<impl warp::Reply, Infallible> {
     let config = mixer::Config {
         name: mixer.name,
-        video: mixer.video.unwrap_or(mixer::default_video_config()),
-        audio: mixer.audio.unwrap_or(mixer::default_audio_config()),
+        video: mixer.video,
+        audio: mixer.audio,
     };
 
     match mixers.lock().await.mixer_create(config) {

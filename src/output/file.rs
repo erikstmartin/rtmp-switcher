@@ -1,3 +1,4 @@
+use super::Config;
 use crate::gst_create_element;
 use crate::Result;
 use gst::prelude::*;
@@ -26,7 +27,8 @@ pub struct File {
 }
 
 impl File {
-    pub fn create(name: &str, location: &str) -> Result<Self> {
+    pub fn create(config: Config, location: &str) -> Result<Self> {
+        let Config { name, .. } = config;
         // Video stream
         let video_queue = gst_create_element("queue", &format!("output_{}_video_queue", name))?;
 

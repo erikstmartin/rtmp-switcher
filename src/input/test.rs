@@ -43,13 +43,10 @@ impl Test {
             &format!("input_{}_video_capsfilter", config.name),
         )?;
         let video_caps = gst::Caps::builder("video/x-raw")
-            .field(
-                "framerate",
-                &gst::Fraction::new(config.video.framerate.unwrap(), 1),
-            )
-            .field("width", &config.video.width.unwrap())
-            .field("height", &config.video.height.unwrap())
-            .field("format", &config.video.format.clone().unwrap())
+            .field("framerate", &gst::Fraction::new(config.video.framerate, 1))
+            .field("width", &config.video.width)
+            .field("height", &config.video.height)
+            .field("format", &config.video.format.to_string())
             .build();
         video_capsfilter.set_property("caps", &video_caps).unwrap();
 
@@ -57,7 +54,7 @@ impl Test {
             "audiotestsrc",
             &format!("input_{}_audiotestsrc", config.name),
         )?;
-        audio.set_property("volume", &config.audio.volume.unwrap())?;
+        audio.set_property("volume", &config.audio.volume)?;
         audio.set_property("is-live", &true)?;
         let audio_queue =
             gst_create_element("queue", &format!("input_{}_audio_queue", config.name))?;

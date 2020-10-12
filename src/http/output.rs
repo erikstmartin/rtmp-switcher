@@ -1,5 +1,6 @@
 use super::{error, message_response, okay, Error, JsonResult};
-use crate::output::Output as MixerOutput;
+use crate::mixer;
+use crate::output::{Config as OutputConfig, EncoderConfig, Output as MixerOutput};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -12,6 +13,9 @@ pub struct CreateRequest {
     pub name: String,
     pub output_type: String,
     pub location: String,
+    pub audio: mixer::AudioConfig,
+    pub video: mixer::VideoConfig,
+    pub encoder: EncoderConfig,
 }
 
 impl CreateRequest {
@@ -64,12 +68,16 @@ pub async fn add(
 ) -> JsonResult {
     let mut mixers = mixers.lock().await;
 
+    let config = OutputConfig {
+        name: output.name.clone(),
+        video: output.video,
+        audio: output.audio,
+    };
+
     let output = match output.output_type.as_str() {
-        "RTMP" => {
-            MixerOutput::create_rtmp(&output.name, &output.location).map_err(super::Error::Mixer)
-        }
-        "Fake" => MixerOutput::create_fake(&output.name).map_err(super::Error::Mixer),
-        "Auto" => MixerOutput::create_auto(&output.name).map_err(super::Error::Mixer),
+        "RTMP" => MixerOutput::create_rtmp(config, &output.location).map_err(super::Error::Mixer),
+        "Fake" => MixerOutput::create_fake(config).map_err(super::Error::Mixer),
+        "Auto" => MixerOutput::create_auto(config).map_err(super::Error::Mixer),
         _ => Err(super::Error::Unknown),
     };
 

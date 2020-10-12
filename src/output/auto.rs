@@ -1,3 +1,4 @@
+use super::Config;
 use crate::gst_create_element;
 use crate::Result;
 use gst::prelude::*;
@@ -18,7 +19,8 @@ pub struct Auto {
 }
 
 impl Auto {
-    pub fn create(name: &str) -> Result<Self> {
+    pub fn create(config: Config) -> Result<Self> {
+        let name = &config.name;
         let videoqueue =
             gst_create_element("queue", format!("output_{}_video_queue", name).as_str())?;
         let video_convert = gst_create_element(

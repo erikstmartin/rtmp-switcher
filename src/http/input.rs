@@ -14,9 +14,12 @@ pub struct CreateRequest {
     pub name: String,
     pub input_type: String,
     pub location: String,
-    pub audio: Option<mixer::AudioConfig>,
-    pub video: Option<mixer::VideoConfig>,
-    pub record: Option<bool>,
+    #[serde(default)]
+    pub audio: mixer::AudioConfig,
+    #[serde(default)]
+    pub video: mixer::VideoConfig,
+    #[serde(default)]
+    pub record: bool,
 }
 
 impl CreateRequest {
@@ -33,8 +36,8 @@ impl CreateRequest {
 /// to be used by the [`mixer`](../mixer/struct.Mixer.html).
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct UpdateRequest {
-    pub audio: Option<mixer::AudioConfig>,
-    pub video: Option<mixer::VideoConfig>,
+    pub audio: mixer::AudioConfig,
+    pub video: mixer::VideoConfig,
 }
 
 impl UpdateRequest {
@@ -65,16 +68,11 @@ pub async fn add(
     mixers: Arc<Mutex<super::Mixers>>,
 ) -> JsonResult {
     let mut mixers = mixers.lock().await;
-    let mixer_config = match mixers.mixer_config(&mixer_name) {
-        Err(e) => return error(e),
-        Ok(c) => c,
-    };
-
     let config = InputConfig {
         name: input.name.clone(),
-        video: input.video.unwrap_or(mixer_config.video),
-        audio: input.audio.unwrap_or(mixer_config.audio),
-        record: input.record.unwrap_or(false),
+        video: input.video,
+        audio: input.audio,
+        record: input.record,
     };
 
     let input = match input.input_type.as_str() {
@@ -165,46 +163,34 @@ pub async fn update(
         None => return error(Error::NotFound),
     };
 
-    if let Some(volume) = request.audio.as_ref().and_then(|a| a.volume) {
-        if input.set_volume(volume).is_err() {
-            return message_response("set_volume failed", StatusCode::INTERNAL_SERVER_ERROR);
-        }
+    if input.set_volume(request.audio.volume).is_err() {
+        return message_response("set_volume failed", StatusCode::INTERNAL_SERVER_ERROR);
     }
 
-    if let Some(zorder) = request.video.as_ref().and_then(|v| v.zorder) {
+    if let Some(zorder) = request.video.zorder {
         if input.set_zorder(zorder).is_err() {
             return message_response("set_zorder failed", StatusCode::INTERNAL_SERVER_ERROR);
         }
     }
 
-    if let Some(width) = request.video.as_ref().and_then(|v| v.width) {
-        if input.set_width(width).is_err() {
-            return message_response("set_width failed", StatusCode::INTERNAL_SERVER_ERROR);
-        }
+    if input.set_width(request.video.width).is_err() {
+        return message_response("set_width failed", StatusCode::INTERNAL_SERVER_ERROR);
     }
 
-    if let Some(height) = request.video.as_ref().and_then(|v| v.height) {
-        if input.set_height(height).is_err() {
-            return message_response("set_height failed", StatusCode::INTERNAL_SERVER_ERROR);
-        }
+    if input.set_height(request.video.height).is_err() {
+        return message_response("set_height failed", StatusCode::INTERNAL_SERVER_ERROR);
     }
 
-    if let Some(xpos) = request.video.as_ref().and_then(|v| v.xpos) {
-        if input.set_xpos(xpos).is_err() {
-            return message_response("set_xpos failed", StatusCode::INTERNAL_SERVER_ERROR);
-        }
+    if input.set_xpos(request.video.xpos).is_err() {
+        return message_response("set_xpos failed", StatusCode::INTERNAL_SERVER_ERROR);
     }
 
-    if let Some(ypos) = request.video.as_ref().and_then(|v| v.ypos) {
-        if input.set_ypos(ypos).is_err() {
-            return message_response("set_ypos failed", StatusCode::INTERNAL_SERVER_ERROR);
-        }
+    if input.set_ypos(request.video.ypos).is_err() {
+        return message_response("set_ypos failed", StatusCode::INTERNAL_SERVER_ERROR);
     }
 
-    if let Some(alpha) = request.video.as_ref().and_then(|v| v.alpha) {
-        if input.set_alpha(alpha).is_err() {
-            return message_response("set_alpha failed", StatusCode::INTERNAL_SERVER_ERROR);
-        }
+    if input.set_alpha(request.video.alpha).is_err() {
+        return message_response("set_alpha failed", StatusCode::INTERNAL_SERVER_ERROR);
     }
 
     message_response("Input updated", StatusCode::OK)

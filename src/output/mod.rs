@@ -3,6 +3,7 @@ pub mod fake;
 pub mod file;
 pub mod rtmp;
 
+use crate::mixer;
 use crate::Result;
 
 pub use auto::Auto;
@@ -10,7 +11,21 @@ pub use fake::Fake;
 pub use file::File;
 use gst::prelude::*;
 use gstreamer as gst;
+use mixer::{AudioConfig, VideoConfig};
 pub use rtmp::RTMP;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct Config {
+    pub name: String,
+    pub video: VideoConfig,
+    pub audio: AudioConfig,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct EncoderConfig {
+    pub name: String,
+}
 
 pub enum Output {
     RTMP(RTMP),
@@ -20,20 +35,20 @@ pub enum Output {
 }
 
 impl Output {
-    pub fn create_rtmp(name: &str, location: &str) -> Result<Self> {
-        RTMP::create(name, location).map(Self::RTMP)
+    pub fn create_rtmp(config: Config, location: &str) -> Result<Self> {
+        RTMP::create(config, location).map(Self::RTMP)
     }
 
-    pub fn create_auto(name: &str) -> Result<Self> {
-        Auto::create(name).map(Self::Auto)
+    pub fn create_auto(config: Config) -> Result<Self> {
+        Auto::create(config).map(Self::Auto)
     }
 
-    pub fn create_fake(name: &str) -> Result<Self> {
-        Fake::create(name).map(Self::Fake)
+    pub fn create_fake(config: Config) -> Result<Self> {
+        Fake::create(config).map(Self::Fake)
     }
 
-    pub fn create_file(name: &str, location: &str) -> Result<Self> {
-        File::create(name, location).map(Self::File)
+    pub fn create_file(config: Config, location: &str) -> Result<Self> {
+        File::create(config, location).map(Self::File)
     }
 
     pub fn name(&self) -> String {
