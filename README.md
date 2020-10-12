@@ -32,6 +32,10 @@ gstreamer
 gstreamer-vaapi
 qt-gstreamer
 ```
+
+## Known issues
+- Cannot record more than one input (potentially only true when also sending to rtmp?)
+
 ## License
 Copyright 2020 RTMP Switcher Authors
 

@@ -58,6 +58,7 @@ impl URI {
             .field("format", &config.video.format.clone().unwrap())
             .field("width", &config.video.width.unwrap())
             .field("height", &config.video.height.unwrap())
+            .field("colorimetry", &"sRGB")
             .build();
         let video_capsfilter = gst_create_element(
             "capsfilter",
