@@ -138,6 +138,12 @@ impl Server {
     }
 }
 
+impl Default for Server {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct Mixers {
     pub mixers: HashMap<String, Mixer>,
 }
@@ -171,7 +177,7 @@ impl Mixers {
 
     pub fn input_add(&mut self, mixer: &str, input: Input) -> Result<(), Error> {
         match self.mixers.get_mut(mixer) {
-            Some(m) => m.input_add(input).map_err(|e| Error::Mixer(e)),
+            Some(m) => m.input_add(input).map_err(Error::Mixer),
             None => Err(Error::NotFound),
         }
     }

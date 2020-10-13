@@ -2,11 +2,9 @@ pub mod fake;
 pub mod test;
 pub mod uri;
 
-use crate::mixer;
 use crate::Result;
-
+use crate::{AudioConfig, VideoConfig};
 pub use fake::Fake;
-use mixer::{AudioConfig, VideoConfig};
 use serde::{Deserialize, Serialize};
 pub use test::Test;
 pub use uri::URI;

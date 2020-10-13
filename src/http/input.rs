@@ -1,6 +1,6 @@
 use super::{error, message_response, okay, Error, JsonResult};
 use crate::input::{Config as InputConfig, Input as MixerInput};
-use crate::mixer;
+use crate::{AudioConfig, VideoConfig};
 
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -15,9 +15,9 @@ pub struct CreateRequest {
     pub input_type: String,
     pub location: String,
     #[serde(default)]
-    pub audio: mixer::AudioConfig,
+    pub audio: AudioConfig,
     #[serde(default)]
-    pub video: mixer::VideoConfig,
+    pub video: VideoConfig,
     #[serde(default)]
     pub record: bool,
 }
@@ -36,8 +36,8 @@ impl CreateRequest {
 /// to be used by the [`mixer`](../mixer/struct.Mixer.html).
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct UpdateRequest {
-    pub audio: mixer::AudioConfig,
-    pub video: mixer::VideoConfig,
+    pub audio: AudioConfig,
+    pub video: VideoConfig,
 }
 
 impl UpdateRequest {

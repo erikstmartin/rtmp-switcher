@@ -3,15 +3,13 @@ pub mod fake;
 pub mod file;
 pub mod rtmp;
 
-use crate::mixer;
 use crate::Result;
-
+use crate::{AudioConfig, VideoConfig};
 pub use auto::Auto;
 pub use fake::Fake;
 pub use file::File;
 use gst::prelude::*;
 use gstreamer as gst;
-use mixer::{AudioConfig, VideoConfig};
 pub use rtmp::RTMP;
 use serde::{Deserialize, Serialize};
 

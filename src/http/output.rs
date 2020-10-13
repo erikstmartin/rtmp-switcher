@@ -1,6 +1,6 @@
 use super::{error, message_response, okay, Error, JsonResult};
-use crate::mixer;
 use crate::output::{Config as OutputConfig, EncoderConfig, Output as MixerOutput};
+use crate::{AudioConfig, VideoConfig};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -13,8 +13,8 @@ pub struct CreateRequest {
     pub name: String,
     pub output_type: String,
     pub location: String,
-    pub audio: mixer::AudioConfig,
-    pub video: mixer::VideoConfig,
+    pub audio: AudioConfig,
+    pub video: VideoConfig,
     pub encoder: EncoderConfig,
 }
 

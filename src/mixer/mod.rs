@@ -3,90 +3,12 @@ mod error;
 use crate::gst_create_element;
 pub use crate::input;
 pub use crate::output;
-use crate::Format;
 use crate::Result;
+use crate::{AudioConfig, VideoConfig};
 pub use error::Error;
 use gst::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-#[serde(default)]
-pub struct VideoConfig {
-    #[serde(default = "VideoConfig::framerate_default")]
-    pub framerate: i32,
-    #[serde(default = "VideoConfig::format_default")]
-    pub format: Format,
-    #[serde(default = "VideoConfig::width_default")]
-    pub width: i32,
-    #[serde(default = "VideoConfig::height_default")]
-    pub height: i32,
-    pub xpos: i32,
-    pub ypos: i32,
-    pub zorder: Option<u32>,
-    #[serde(default = "VideoConfig::alpha_default")]
-    pub alpha: f64,
-    pub repeat: bool,
-}
-
-impl VideoConfig {
-    fn framerate_default() -> i32 {
-        30
-    }
-
-    fn format_default() -> Format {
-        Format::RGBA
-    }
-
-    fn height_default() -> i32 {
-        1920
-    }
-
-    fn width_default() -> i32 {
-        1080
-    }
-
-    fn alpha_default() -> f64 {
-        1.0
-    }
-}
-
-impl Default for VideoConfig {
-    fn default() -> Self {
-        Self {
-            framerate: Self::framerate_default(),
-            width: Self::width_default(),
-            height: Self::height_default(),
-            zorder: None,
-            xpos: 0,
-            ypos: 0,
-            alpha: Self::alpha_default(),
-            repeat: false,
-            format: Self::format_default(),
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-#[serde(default)]
-pub struct AudioConfig {
-    #[serde(default = "AudioConfig::volume_default")]
-    pub volume: f64,
-}
-
-impl Default for AudioConfig {
-    fn default() -> Self {
-        Self {
-            volume: Self::volume_default(),
-        }
-    }
-}
-
-impl AudioConfig {
-    fn volume_default() -> f64 {
-        1.0
-    }
-}
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Config {
@@ -188,7 +110,7 @@ impl Mixer {
         let config = input::Config {
             name: "background".to_string(),
             audio: AudioConfig { volume: 0.0 },
-            video: config.video.clone(),
+            video: config.video,
             record: false,
         };
 

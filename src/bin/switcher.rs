@@ -3,7 +3,6 @@ use gstreamer as gst;
 use std::net::SocketAddr;
 use switcher::http::Server;
 use thiserror::Error;
-use tracing_subscriber;
 
 #[derive(Debug, Error)]
 enum RTMPSwitcherError {

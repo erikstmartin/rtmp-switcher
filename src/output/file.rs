@@ -70,7 +70,7 @@ impl File {
             gst_create_element("fdkaacenc", &format!("output_{}_audio_fdkaacenc", name))?;
 
         Ok(Self {
-            name: name.to_string(),
+            name,
             location: location.to_string(),
             pipeline: None,
             video_queue,

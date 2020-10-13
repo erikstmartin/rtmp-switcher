@@ -27,7 +27,7 @@ pub fn routes(
         .or(output_list(mixers.clone()))
         .or(output_get(mixers.clone()))
         .or(output_add(mixers.clone()))
-        .or(output_remove(mixers.clone()))
+        .or(output_remove(mixers))
 }
 
 /// Setup route for `POST /mixers`

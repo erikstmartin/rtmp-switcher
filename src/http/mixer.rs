@@ -1,4 +1,5 @@
-use crate::mixer;
+use crate::mixer::Config as MixerConfig;
+use crate::{AudioConfig, VideoConfig};
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use std::io::Write;
@@ -13,9 +14,9 @@ use warp::Filter;
 pub struct CreateRequest {
     pub name: String,
     #[serde(default)]
-    pub video: mixer::VideoConfig,
+    pub video: VideoConfig,
     #[serde(default)]
-    pub audio: mixer::AudioConfig,
+    pub audio: AudioConfig,
 }
 
 impl CreateRequest {
@@ -37,7 +38,7 @@ pub async fn create(
     mixer: CreateRequest,
     mixers: Arc<Mutex<super::Mixers>>,
 ) -> Result<impl warp::Reply, Infallible> {
-    let config = mixer::Config {
+    let config = MixerConfig {
         name: mixer.name,
         video: mixer.video,
         audio: mixer.audio,
