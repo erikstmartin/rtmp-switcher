@@ -1,6 +1,5 @@
 use super::Config;
-use crate::gst_create_element;
-use crate::Result;
+use crate::{gst_create_element, Result, VideoEncoderProfile, VideoEncoderSpeed};
 use gst::prelude::*;
 use gstreamer as gst;
 
@@ -42,13 +41,34 @@ impl RTMP {
             gst_create_element("capsfilter", &format!("output_{}_video_capsfilter", name))?;
 
         let video_caps = gst::Caps::builder("video/x-raw")
-            .field("framerate", &gst::Fraction::new(30, 1))
-            .field("format", &"I420")
-            .field("profile", &"high")
+            .field("framerate", &gst::Fraction::new(config.video.framerate, 1))
+            .field("format", &config.video.format.to_string())
+            .field(
+                "profile",
+                &config
+                    .encoder
+                    .video
+                    .profile
+                    .unwrap_or(VideoEncoderProfile::High)
+                    .to_string(),
+            )
+            .field(
+                "speed",
+                &config
+                    .encoder
+                    .video
+                    .speed
+                    .unwrap_or(VideoEncoderSpeed::None)
+                    .to_string(),
+            )
             .build();
         video_capsfilter.set_property("caps", &video_caps).unwrap();
 
-        let x264enc = gst_create_element("nvh264enc", &format!("output_{}_video_x264enc", name))?;
+        let x264enc = gst_create_element(
+            &config.encoder.video.encoder.to_string(),
+            &format!("output_{}_video_{}", name, config.encoder.video.encoder),
+        )?;
+
         let h264parse =
             gst_create_element("h264parse", &format!("output_{}_video_h264parse", name))?;
 

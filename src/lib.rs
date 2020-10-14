@@ -28,6 +28,7 @@ pub struct VideoConfig {
     pub height: i32,
     pub xpos: i32,
     pub ypos: i32,
+    #[serde(default)]
     pub zorder: Option<u32>,
     #[serde(default = "VideoConfig::alpha_default")]
     pub alpha: f64,
@@ -40,15 +41,15 @@ impl VideoConfig {
     }
 
     fn format_default() -> Format {
-        Format::RGBA
+        Format::I420
     }
 
     fn height_default() -> i32 {
-        1920
+        1080
     }
 
     fn width_default() -> i32 {
-        1080
+        1920
     }
 
     fn alpha_default() -> f64 {
@@ -68,6 +69,52 @@ impl Default for VideoConfig {
             alpha: Self::alpha_default(),
             repeat: false,
             format: Self::format_default(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct VideoEncoderConfig {
+    #[serde(default = "VideoEncoderConfig::encoder_default")]
+    pub encoder: VideoEncoder,
+    pub profile: Option<VideoEncoderProfile>,
+    pub speed: Option<VideoEncoderSpeed>,
+    pub preset: Option<VideoEncoderPreset>,
+}
+
+impl VideoEncoderConfig {
+    fn encoder_default() -> VideoEncoder {
+        VideoEncoder::H264
+    }
+}
+
+impl Default for VideoEncoderConfig {
+    fn default() -> Self {
+        Self {
+            encoder: VideoEncoderConfig::encoder_default(),
+            profile: Some(VideoEncoderProfile::High),
+            preset: None,
+            speed: Some(VideoEncoderSpeed::Medium),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct AudioEncoderConfig {
+    #[serde(default = "AudioEncoderConfig::encoder_default")]
+    pub encoder: AudioEncoder,
+}
+
+impl AudioEncoderConfig {
+    fn encoder_default() -> AudioEncoder {
+        AudioEncoder::AAC
+    }
+}
+
+impl Default for AudioEncoderConfig {
+    fn default() -> Self {
+        Self {
+            encoder: AudioEncoderConfig::encoder_default(),
         }
     }
 }
@@ -95,16 +142,154 @@ impl AudioConfig {
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Clone)]
 #[allow(non_camel_case_types)]
-pub enum Encoder {
+pub enum VideoEncoder {
     H264,
-    NVH264,
+    NVENC,
+    VP9,
+}
+
+impl std::fmt::Display for VideoEncoder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use VideoEncoder::*;
+
+        let s = match self {
+            H264 => "x264enc",
+            NVENC => "nvh264enc",
+            VP9 => "vp9enc",
+        };
+
+        f.write_str(s)
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Clone)]
+#[allow(non_camel_case_types)]
+pub enum VideoEncoderPreset {
+    Default,
+    HighPerformance,
+    HighQuality,
+    LowLatency,
+    LowLatencyHighQuality,
+}
+
+impl std::fmt::Display for VideoEncoderPreset {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use VideoEncoderPreset::*;
+
+        let s = match self {
+            Default => "default",
+            HighPerformance => "hp",
+            HighQuality => "hq",
+            LowLatency => "low-latency",
+            LowLatencyHighQuality => "low-latency-hq",
+        };
+
+        f.write_str(s)
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Clone)]
+#[allow(non_camel_case_types)]
+pub enum VideoEncoderProfile {
+    High,
+    Main,
+    Baseline,
+}
+
+impl std::fmt::Display for VideoEncoderProfile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use VideoEncoderProfile::*;
+
+        let s = match self {
+            High => "high",
+            Main => "main",
+            Baseline => "baseline",
+        };
+
+        f.write_str(s)
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Clone)]
+#[allow(non_camel_case_types)]
+pub enum VideoEncoderSpeed {
+    None,
+    UltraFast,
+    SuperFast,
+    VeryFast,
+    Faster,
+    Fast,
+    Medium,
+    Slow,
+    Slower,
+    VerySlow,
+    Placebo,
+}
+
+impl std::fmt::Display for VideoEncoderSpeed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use VideoEncoderSpeed::*;
+
+        let s = match self {
+            None => "none",
+            UltraFast => "ultrafast",
+            SuperFast => "superfast",
+            VeryFast => "veryfast",
+            Faster => "faster",
+            Fast => "fast",
+            Medium => "medium",
+            Slow => "slow",
+            Slower => "slower",
+            VerySlow => "veryslow",
+            Placebo => "placebo",
+        };
+
+        f.write_str(s)
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Clone)]
+#[allow(non_camel_case_types)]
+pub enum AudioEncoder {
+    AAC,
+    MP3,
+    Vorbis,
+}
+
+impl std::fmt::Display for AudioEncoder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use AudioEncoder::*;
+
+        let s = match self {
+            AAC => "fdkaacenc",
+            MP3 => "lamemp3enc",
+            Vorbis => "vorbisenc",
+        };
+
+        f.write_str(s)
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Clone)]
 #[allow(non_camel_case_types)]
 pub enum Mux {
     FLV,
+    MP4,
     MKV,
+}
+
+impl std::fmt::Display for Mux {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use Mux::*;
+
+        let s = match self {
+            FLV => "flvmux",
+            MP4 => "mp4mux",
+            MKV => "matroskamux",
+        };
+
+        f.write_str(s)
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Clone)]

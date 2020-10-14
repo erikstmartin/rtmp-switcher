@@ -1,8 +1,9 @@
 use super::Config;
-use crate::gst_create_element;
-use crate::mixer;
-use crate::output::{Config as OutputConfig, File as FileOutput};
-use crate::Result;
+use crate::{
+    gst_create_element, mixer,
+    output::{Config as OutputConfig, EncoderConfig, File as FileOutput},
+    AudioEncoder, AudioEncoderConfig, Mux, Result, VideoEncoder, VideoEncoderConfig,
+};
 
 use gst::prelude::*;
 use gstreamer as gst;
@@ -172,6 +173,18 @@ impl URI {
             name: format!("record_{}", config.name),
             audio: config.audio.clone(),
             video: config.video.clone(),
+            encoder: EncoderConfig {
+                audio: AudioEncoderConfig {
+                    encoder: AudioEncoder::Vorbis,
+                },
+                video: VideoEncoderConfig {
+                    encoder: VideoEncoder::VP9,
+                    profile: None,
+                    preset: None,
+                    speed: None,
+                },
+            },
+            mux: Some(Mux::MKV),
         };
 
         let record_output = match config.record {

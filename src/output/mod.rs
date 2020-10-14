@@ -4,7 +4,7 @@ pub mod file;
 pub mod rtmp;
 
 use crate::Result;
-use crate::{AudioConfig, VideoConfig};
+use crate::{AudioConfig, AudioEncoderConfig, Mux, VideoConfig, VideoEncoderConfig};
 pub use auto::Auto;
 pub use fake::Fake;
 pub use file::File;
@@ -18,11 +18,27 @@ pub struct Config {
     pub name: String,
     pub video: VideoConfig,
     pub audio: AudioConfig,
+    #[serde(default)]
+    pub encoder: EncoderConfig,
+    #[serde(default)]
+    pub mux: Option<Mux>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EncoderConfig {
-    pub name: String,
+    #[serde(default)]
+    pub audio: AudioEncoderConfig,
+    #[serde(default)]
+    pub video: VideoEncoderConfig,
+}
+
+impl Default for EncoderConfig {
+    fn default() -> Self {
+        Self {
+            audio: AudioEncoderConfig::default(),
+            video: VideoEncoderConfig::default(),
+        }
+    }
 }
 
 pub enum Output {

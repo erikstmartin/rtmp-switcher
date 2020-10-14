@@ -1,6 +1,8 @@
 use super::{error, message_response, okay, Error, JsonResult};
-use crate::output::{Config as OutputConfig, EncoderConfig, Output as MixerOutput};
-use crate::{AudioConfig, VideoConfig};
+use crate::{
+    output::{Config as OutputConfig, EncoderConfig, Output as MixerOutput},
+    AudioConfig, VideoConfig,
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -13,8 +15,11 @@ pub struct CreateRequest {
     pub name: String,
     pub output_type: String,
     pub location: String,
+    #[serde(default)]
     pub audio: AudioConfig,
+    #[serde(default)]
     pub video: VideoConfig,
+    #[serde(default)]
     pub encoder: EncoderConfig,
 }
 
@@ -57,6 +62,7 @@ pub async fn list(mixer_name: String, mixers: Arc<Mutex<super::Mixers>>) -> Json
         .collect();
     okay(&outputs)
 }
+
 /// HTTP Handler for creating an [`output::Output`](../output/struct.Output.html)
 /// It will add the resulting output to the [`mixer`](../mixer/struct.Mixer.html) which will
 /// link the new output to the Gstreamer pipeline.
@@ -72,6 +78,8 @@ pub async fn add(
         name: output.name.clone(),
         video: output.video,
         audio: output.audio,
+        encoder: output.encoder,
+        mux: None,
     };
 
     let output = match output.output_type.as_str() {
