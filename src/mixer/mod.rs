@@ -252,20 +252,27 @@ impl Mixer {
             .get_mut(name)
             .ok_or_else(|| Error::NotFound(mixer_name, name.to_string()))?;
 
-        input.set_zorder(1000)?;
-        input.set_xpos(0)?;
-        input.set_ypos(0)?;
-        input.set_width(self.config.video.width)?;
-        input.set_height(self.config.video.height)?;
+        // TODO: Find the pad on the compositor that is associated with this input
+        // - Update properties on that pad
+        //
+        // TODO: Find the volume element associated with this input
+        // - Update volume
+
+        input.set_zorder(1000, false)?;
+        input.set_xpos(0, false)?;
+        input.set_ypos(0, false)?;
+        input.set_width(self.config.video.width, false)?;
+        input.set_height(self.config.video.height, false)?;
 
         let input_config = input.config();
-        input.set_volume(input_config.audio.volume)?;
+        input.set_volume(input_config.audio.volume, false)?;
 
         // Decrease volume and restore zorder of all other inputs
         for (n, input) in self.inputs.iter_mut() {
             if n != name {
-                input.set_volume(0.0)?;
-                input.set_zorder(input_config.video.zorder.unwrap())?;
+                input.set_volume(0.0, false)?;
+                // TODO: We don't want this unwrap.
+                input.set_zorder(input_config.video.zorder.unwrap(), false)?;
             }
         }
 

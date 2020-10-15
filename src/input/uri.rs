@@ -331,14 +331,18 @@ impl URI {
         Ok(())
     }
 
-    pub fn set_volume(&mut self, volume: f64) -> Result<()> {
-        self.config.audio.volume = volume;
+    pub fn set_volume(&mut self, volume: f64, update_config: bool) -> Result<()> {
+        if update_config {
+            self.config.audio.volume = volume;
+        }
         self.audio_volume.set_property("volume", &volume)?;
         Ok(())
     }
 
-    pub fn set_zorder(&mut self, zorder: u32) -> Result<()> {
-        self.config.video.zorder = Some(zorder);
+    pub fn set_zorder(&mut self, zorder: u32, update_config: bool) -> Result<()> {
+        if update_config {
+            self.config.video.zorder = Some(zorder);
+        }
         super::set_peer_pad_property(
             &self.video_queue.get_static_pad("src").unwrap(),
             "zorder",
@@ -348,8 +352,10 @@ impl URI {
         Ok(())
     }
 
-    pub fn set_width(&mut self, width: i32) -> Result<()> {
-        self.config.video.width = width;
+    pub fn set_width(&mut self, width: i32, update_config: bool) -> Result<()> {
+        if update_config {
+            self.config.video.width = width;
+        }
         super::set_peer_pad_property(
             &self.video_queue.get_static_pad("src").unwrap(),
             "width",
@@ -359,8 +365,10 @@ impl URI {
         Ok(())
     }
 
-    pub fn set_height(&mut self, height: i32) -> Result<()> {
-        self.config.video.height = height;
+    pub fn set_height(&mut self, height: i32, update_config: bool) -> Result<()> {
+        if update_config {
+            self.config.video.height = height;
+        }
         super::set_peer_pad_property(
             &self.video_queue.get_static_pad("src").unwrap(),
             "height",
@@ -370,8 +378,10 @@ impl URI {
         Ok(())
     }
 
-    pub fn set_xpos(&mut self, xpos: i32) -> Result<()> {
-        self.config.video.xpos = xpos;
+    pub fn set_xpos(&mut self, xpos: i32, update_config: bool) -> Result<()> {
+        if update_config {
+            self.config.video.xpos = xpos;
+        }
         super::set_peer_pad_property(
             &self.video_queue.get_static_pad("src").unwrap(),
             "xpos",
@@ -381,8 +391,10 @@ impl URI {
         Ok(())
     }
 
-    pub fn set_ypos(&mut self, ypos: i32) -> Result<()> {
-        self.config.video.ypos = ypos;
+    pub fn set_ypos(&mut self, ypos: i32, update_config: bool) -> Result<()> {
+        if update_config {
+            self.config.video.ypos = ypos;
+        }
         super::set_peer_pad_property(
             &self.video_queue.get_static_pad("src").unwrap(),
             "ypos",
@@ -392,8 +404,10 @@ impl URI {
         Ok(())
     }
 
-    pub fn set_alpha(&mut self, alpha: f64) -> Result<()> {
-        self.config.video.alpha = alpha;
+    pub fn set_alpha(&mut self, alpha: f64, update_config: bool) -> Result<()> {
+        if update_config {
+            self.config.video.alpha = alpha;
+        }
         super::set_peer_pad_property(
             &self.video_queue.get_static_pad("src").unwrap(),
             "alpha",

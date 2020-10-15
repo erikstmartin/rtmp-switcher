@@ -92,59 +92,59 @@ impl Input {
         }
     }
 
-    pub fn set_volume(&mut self, volume: f64) -> Result<()> {
+    pub fn set_volume(&mut self, volume: f64, update_config: bool) -> Result<()> {
         match self {
-            Input::URI(input) => input.set_volume(volume),
-            Input::Test(input) => input.set_volume(volume),
-            Input::Fake(input) => input.set_volume(volume),
+            Input::URI(input) => input.set_volume(volume, update_config),
+            Input::Test(input) => input.set_volume(volume, update_config),
+            Input::Fake(input) => input.set_volume(volume, update_config),
         }
     }
 
-    pub fn set_zorder(&mut self, zorder: u32) -> Result<()> {
+    pub fn set_zorder(&mut self, zorder: u32, update_config: bool) -> Result<()> {
         match self {
-            Input::URI(input) => input.set_zorder(zorder),
-            Input::Test(input) => input.set_zorder(zorder),
-            Input::Fake(input) => input.set_zorder(zorder),
+            Input::URI(input) => input.set_zorder(zorder, update_config),
+            Input::Test(input) => input.set_zorder(zorder, update_config),
+            Input::Fake(input) => input.set_zorder(zorder, update_config),
         }
     }
 
-    pub fn set_width(&mut self, width: i32) -> Result<()> {
+    pub fn set_width(&mut self, width: i32, update_config: bool) -> Result<()> {
         match self {
-            Input::URI(input) => input.set_width(width),
-            Input::Test(input) => input.set_width(width),
-            Input::Fake(input) => input.set_width(width),
+            Input::URI(input) => input.set_width(width, update_config),
+            Input::Test(input) => input.set_width(width, update_config),
+            Input::Fake(input) => input.set_width(width, update_config),
         }
     }
 
-    pub fn set_height(&mut self, height: i32) -> Result<()> {
+    pub fn set_height(&mut self, height: i32, update_config: bool) -> Result<()> {
         match self {
-            Input::URI(input) => input.set_height(height),
-            Input::Test(input) => input.set_height(height),
-            Input::Fake(input) => input.set_height(height),
+            Input::URI(input) => input.set_height(height, update_config),
+            Input::Test(input) => input.set_height(height, update_config),
+            Input::Fake(input) => input.set_height(height, update_config),
         }
     }
 
-    pub fn set_xpos(&mut self, xpos: i32) -> Result<()> {
+    pub fn set_xpos(&mut self, xpos: i32, update_config: bool) -> Result<()> {
         match self {
-            Input::URI(input) => input.set_xpos(xpos),
-            Input::Test(input) => input.set_xpos(xpos),
-            Input::Fake(input) => input.set_xpos(xpos),
+            Input::URI(input) => input.set_xpos(xpos, update_config),
+            Input::Test(input) => input.set_xpos(xpos, update_config),
+            Input::Fake(input) => input.set_xpos(xpos, update_config),
         }
     }
 
-    pub fn set_ypos(&mut self, ypos: i32) -> Result<()> {
+    pub fn set_ypos(&mut self, ypos: i32, update_config: bool) -> Result<()> {
         match self {
-            Input::URI(input) => input.set_ypos(ypos),
-            Input::Test(input) => input.set_ypos(ypos),
-            Input::Fake(input) => input.set_ypos(ypos),
+            Input::URI(input) => input.set_ypos(ypos, update_config),
+            Input::Test(input) => input.set_ypos(ypos, update_config),
+            Input::Fake(input) => input.set_ypos(ypos, update_config),
         }
     }
 
-    pub fn set_alpha(&mut self, alpha: f64) -> Result<()> {
+    pub fn set_alpha(&mut self, alpha: f64, update_config: bool) -> Result<()> {
         match self {
-            Input::URI(input) => input.set_alpha(alpha),
-            Input::Test(input) => input.set_alpha(alpha),
-            Input::Fake(input) => input.set_alpha(alpha),
+            Input::URI(input) => input.set_alpha(alpha, update_config),
+            Input::Test(input) => input.set_alpha(alpha, update_config),
+            Input::Fake(input) => input.set_alpha(alpha, update_config),
         }
     }
 

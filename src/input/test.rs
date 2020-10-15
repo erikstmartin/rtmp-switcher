@@ -160,11 +160,11 @@ impl Test {
         Ok(())
     }
 
-    pub fn set_volume(&mut self, _volume: f64) -> Result<()> {
+    pub fn set_volume(&mut self, _volume: f64, _update_config: bool) -> Result<()> {
         Ok(())
     }
 
-    pub fn set_zorder(&mut self, zorder: u32) -> Result<()> {
+    pub fn set_zorder(&mut self, zorder: u32, _update_config: bool) -> Result<()> {
         super::set_peer_pad_property(
             &self.video_capsfilter.get_static_pad("src").unwrap(),
             "zorder",
@@ -174,23 +174,23 @@ impl Test {
         Ok(())
     }
 
-    pub fn set_width(&mut self, _width: i32) -> Result<()> {
+    pub fn set_width(&mut self, _width: i32, _update_config: bool) -> Result<()> {
         Ok(())
     }
 
-    pub fn set_height(&mut self, _height: i32) -> Result<()> {
+    pub fn set_height(&mut self, _height: i32, _update_config: bool) -> Result<()> {
         Ok(())
     }
 
-    pub fn set_xpos(&mut self, _xpos: i32) -> Result<()> {
+    pub fn set_xpos(&mut self, _xpos: i32, _update_config: bool) -> Result<()> {
         Ok(())
     }
 
-    pub fn set_ypos(&mut self, _ypos: i32) -> Result<()> {
+    pub fn set_ypos(&mut self, _ypos: i32, _update_config: bool) -> Result<()> {
         Ok(())
     }
 
-    pub fn set_alpha(&mut self, _alpha: f64) -> Result<()> {
+    pub fn set_alpha(&mut self, _alpha: f64, _update_config: bool) -> Result<()> {
         Ok(())
     }
 

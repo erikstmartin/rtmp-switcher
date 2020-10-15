@@ -163,33 +163,33 @@ pub async fn update(
         None => return error(Error::NotFound),
     };
 
-    if input.set_volume(request.audio.volume).is_err() {
+    if input.set_volume(request.audio.volume, true).is_err() {
         return message_response("set_volume failed", StatusCode::INTERNAL_SERVER_ERROR);
     }
 
     if let Some(zorder) = request.video.zorder {
-        if input.set_zorder(zorder).is_err() {
+        if input.set_zorder(zorder, true).is_err() {
             return message_response("set_zorder failed", StatusCode::INTERNAL_SERVER_ERROR);
         }
     }
 
-    if input.set_width(request.video.width).is_err() {
+    if input.set_width(request.video.width, true).is_err() {
         return message_response("set_width failed", StatusCode::INTERNAL_SERVER_ERROR);
     }
 
-    if input.set_height(request.video.height).is_err() {
+    if input.set_height(request.video.height, true).is_err() {
         return message_response("set_height failed", StatusCode::INTERNAL_SERVER_ERROR);
     }
 
-    if input.set_xpos(request.video.xpos).is_err() {
+    if input.set_xpos(request.video.xpos, true).is_err() {
         return message_response("set_xpos failed", StatusCode::INTERNAL_SERVER_ERROR);
     }
 
-    if input.set_ypos(request.video.ypos).is_err() {
+    if input.set_ypos(request.video.ypos, true).is_err() {
         return message_response("set_ypos failed", StatusCode::INTERNAL_SERVER_ERROR);
     }
 
-    if input.set_alpha(request.video.alpha).is_err() {
+    if input.set_alpha(request.video.alpha, true).is_err() {
         return message_response("set_alpha failed", StatusCode::INTERNAL_SERVER_ERROR);
     }
 
