@@ -62,7 +62,7 @@ impl URI {
             "capsfilter",
             &format!("input_{}_video_capsfilter", config.name),
         )?;
-        video_capsfilter.set_property("caps", &video_caps).unwrap();
+        video_capsfilter.set_property("caps", &video_caps)?;
 
         let video_queue =
             gst_create_element("queue2", &format!("input_{}_video_queue", config.name))?;
@@ -91,6 +91,7 @@ impl URI {
         let video = video_convert.clone();
         let vqueue = video_queue.clone();
         let video_config = config.video.clone();
+        let input_name = config.name.clone();
         source.connect_pad_added(move |src, src_pad| {
             println!(
                 "Received new pad {} from {}",
@@ -142,9 +143,27 @@ impl URI {
                 src_pad
                     .set_offset(gst::format::GenericFormattedValue::Time(running_time).get_value());
 
-                let queue_pad = vqueue.get_static_pad("src").unwrap();
+                let queue_pad = match vqueue.get_static_pad("src") {
+                    Some(pad) => pad,
+                    None => {
+                        tracing::warn!(
+                            input = input_name.as_str(),
+                            "Failed to retrieve static src pad for video"
+                        );
+                        return;
+                    }
+                };
                 if queue_pad.is_linked() {
-                    let compositor_pad = queue_pad.get_peer().unwrap();
+                    let compositor_pad = match queue_pad.get_peer() {
+                        Some(pad) => pad,
+                        None => {
+                            tracing::warn!(
+                                input = input_name.as_str(),
+                                "Failed to retrieve compositor pad for video"
+                            );
+                            return;
+                        }
+                    };
 
                     if let Some(zorder) = video_config.zorder {
                         let _ = compositor_pad.set_property("zorder", &zorder);
@@ -166,7 +185,7 @@ impl URI {
 
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .map_err(|e| mixer::Error::System(e.to_string()))?
             .as_millis();
 
         let recording_config = OutputConfig {
@@ -279,15 +298,22 @@ impl URI {
             &video,
         ])?;
 
+        // If we add an input and do not supply its zorder, the compositor will increment its
+        // highest zorder and use that for this pad. We need to determine what that zorder is
+        // and store it to the config, so that if the mixer needs to temporarily change the zorder
+        // it is able to restore it back to its original state.
         let prop = self
             .video_queue
             .get_static_pad("src")
-            .unwrap()
+            .ok_or(mixer::Error::Gstreamer(
+                "Failed to retrieve src pad for video_queue".to_string(),
+            ))?
             .get_peer()
-            .unwrap()
+            .ok_or(mixer::Error::Gstreamer(
+                "Failed to retrieve peer pad for video_queue".to_string(),
+            ))?
             .get_property("zorder")?;
         let zorder = prop.downcast::<u32>().map_err(|_| mixer::Error::Unknown)?;
-
         self.config.video.zorder = Some(zorder.get_some());
 
         Ok(())
@@ -297,22 +323,24 @@ impl URI {
         super::release_request_pad(&self.audio_queue)?;
         super::release_request_pad(&self.video_queue)?;
 
-        self.pipeline.as_ref().unwrap().remove_many(&[
-            &self.source,
-            &self.audio_tee,
-            &self.audio_tee_queue,
-            &self.audio_convert,
-            &self.audio_volume,
-            &self.audio_resample,
-            &self.audio_queue,
-            &self.video_tee,
-            &self.video_tee_queue,
-            &self.video_convert,
-            &self.video_scale,
-            &self.video_rate,
-            &self.video_capsfilter,
-            &self.video_queue,
-        ])?;
+        if let Some(pipeline) = self.pipeline.as_ref() {
+            pipeline.remove_many(&[
+                &self.source,
+                &self.audio_tee,
+                &self.audio_tee_queue,
+                &self.audio_convert,
+                &self.audio_volume,
+                &self.audio_resample,
+                &self.audio_queue,
+                &self.video_tee,
+                &self.video_tee_queue,
+                &self.video_convert,
+                &self.video_scale,
+                &self.video_rate,
+                &self.video_capsfilter,
+                &self.video_queue,
+            ])?;
+        }
 
         Ok(())
     }
@@ -344,7 +372,12 @@ impl URI {
             self.config.video.zorder = Some(zorder);
         }
         super::set_peer_pad_property(
-            &self.video_queue.get_static_pad("src").unwrap(),
+            &self
+                .video_queue
+                .get_static_pad("src")
+                .ok_or(mixer::Error::Gstreamer(
+                    "failed to retrieve src pad".to_string(),
+                ))?,
             "zorder",
             &zorder,
         )?;
@@ -357,7 +390,12 @@ impl URI {
             self.config.video.width = width;
         }
         super::set_peer_pad_property(
-            &self.video_queue.get_static_pad("src").unwrap(),
+            &self
+                .video_queue
+                .get_static_pad("src")
+                .ok_or(mixer::Error::Gstreamer(
+                    "failed to retrieve src pad".to_string(),
+                ))?,
             "width",
             &width,
         )?;
@@ -370,7 +408,12 @@ impl URI {
             self.config.video.height = height;
         }
         super::set_peer_pad_property(
-            &self.video_queue.get_static_pad("src").unwrap(),
+            &self
+                .video_queue
+                .get_static_pad("src")
+                .ok_or(mixer::Error::Gstreamer(
+                    "failed to retrieve src pad".to_string(),
+                ))?,
             "height",
             &height,
         )?;
@@ -383,7 +426,12 @@ impl URI {
             self.config.video.xpos = xpos;
         }
         super::set_peer_pad_property(
-            &self.video_queue.get_static_pad("src").unwrap(),
+            &self
+                .video_queue
+                .get_static_pad("src")
+                .ok_or(mixer::Error::Gstreamer(
+                    "failed to retrieve src pad".to_string(),
+                ))?,
             "xpos",
             &xpos,
         )?;
@@ -396,7 +444,12 @@ impl URI {
             self.config.video.ypos = ypos;
         }
         super::set_peer_pad_property(
-            &self.video_queue.get_static_pad("src").unwrap(),
+            &self
+                .video_queue
+                .get_static_pad("src")
+                .ok_or(mixer::Error::Gstreamer(
+                    "failed to retrieve src pad".to_string(),
+                ))?,
             "ypos",
             &ypos,
         )?;
@@ -409,7 +462,12 @@ impl URI {
             self.config.video.alpha = alpha;
         }
         super::set_peer_pad_property(
-            &self.video_queue.get_static_pad("src").unwrap(),
+            &self
+                .video_queue
+                .get_static_pad("src")
+                .ok_or(mixer::Error::Gstreamer(
+                    "failed to retrieve src pad".to_string(),
+                ))?,
             "alpha",
             &alpha,
         )?;

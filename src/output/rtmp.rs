@@ -62,7 +62,7 @@ impl RTMP {
                     .to_string(),
             )
             .build();
-        video_capsfilter.set_property("caps", &video_caps).unwrap();
+        video_capsfilter.set_property("caps", &video_caps)?;
 
         let x264enc = gst_create_element(
             &config.encoder.video.encoder.to_string(),
@@ -177,27 +177,28 @@ impl RTMP {
         super::release_request_pad(&self.audio_queue)?;
         super::release_request_pad(&self.video_queue)?;
 
-        let pipeline = self.pipeline.as_ref().unwrap();
-        pipeline.remove_many(&[
-            &self.video_queue,
-            &self.video_convert,
-            &self.video_scale,
-            &self.video_rate,
-            &self.video_capsfilter,
-            &self.x264enc,
-            &self.h264parse,
-            &self.flvqueue,
-            &self.flvmux,
-            &self.queue_sink,
-            &self.video_sink,
-        ])?;
+        if let Some(pipeline) = self.pipeline.as_ref() {
+            pipeline.remove_many(&[
+                &self.video_queue,
+                &self.video_convert,
+                &self.video_scale,
+                &self.video_rate,
+                &self.video_capsfilter,
+                &self.x264enc,
+                &self.h264parse,
+                &self.flvqueue,
+                &self.flvmux,
+                &self.queue_sink,
+                &self.video_sink,
+            ])?;
 
-        pipeline.remove_many(&[
-            &self.audio_queue,
-            &self.audio_convert,
-            &self.audio_resample,
-            &self.audioenc,
-        ])?;
+            pipeline.remove_many(&[
+                &self.audio_queue,
+                &self.audio_convert,
+                &self.audio_resample,
+                &self.audioenc,
+            ])?;
+        }
 
         Ok(())
     }

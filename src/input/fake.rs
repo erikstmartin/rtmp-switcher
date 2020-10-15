@@ -1,6 +1,5 @@
 use super::Config;
-use crate::gst_create_element;
-use crate::Result;
+use crate::{gst_create_element, mixer::Error as MixerError, Result};
 
 use gst::prelude::*;
 use gstreamer as gst;
@@ -53,10 +52,9 @@ impl Fake {
         super::release_request_pad(&self.audio)?;
         super::release_request_pad(&self.video)?;
 
-        self.pipeline
-            .as_ref()
-            .unwrap()
-            .remove_many(&[&self.audio, &self.video])?;
+        if let Some(pipeline) = self.pipeline.as_ref() {
+            pipeline.remove_many(&[&self.audio, &self.video])?;
+        }
         Ok(())
     }
 
@@ -70,9 +68,17 @@ impl Fake {
         Ok(())
     }
 
-    pub fn set_zorder(&mut self, zorder: u32, _update_config: bool) -> Result<()> {
+    pub fn set_zorder(&mut self, zorder: u32, update_config: bool) -> Result<()> {
+        if update_config {
+            self.config.video.zorder = Some(zorder);
+        }
         super::set_peer_pad_property(
-            &self.video.get_static_pad("src").unwrap(),
+            &self
+                .video
+                .get_static_pad("src")
+                .ok_or(MixerError::Gstreamer(
+                    "failed to retrieve src pad".to_string(),
+                ))?,
             "zorder",
             &zorder,
         )?;

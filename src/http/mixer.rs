@@ -1,14 +1,14 @@
-use crate::mixer::Config as MixerConfig;
-use crate::{AudioConfig, VideoConfig};
+use super::{error, message_response, okay, JsonResult};
+use crate::{mixer::Config as MixerConfig, AudioConfig, VideoConfig};
 use serde::{Deserialize, Serialize};
-use std::convert::Infallible;
-use std::io::Write;
-use std::process::{Command, Stdio};
-use std::sync::Arc;
+use std::{
+    convert::Infallible,
+    io::Write,
+    process::{Command, Stdio},
+    sync::Arc,
+};
 use tokio::sync::Mutex;
-use warp::http::StatusCode;
-use warp::reply::Reply;
-use warp::Filter;
+use warp::{http::StatusCode, reply, Filter, Reply};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct CreateRequest {
@@ -34,10 +34,7 @@ pub struct Mixer {
     pub output_count: usize,
 }
 
-pub async fn create(
-    mixer: CreateRequest,
-    mixers: Arc<Mutex<super::Mixers>>,
-) -> Result<impl warp::Reply, Infallible> {
+pub async fn create(mixer: CreateRequest, mixers: Arc<Mutex<super::Mixers>>) -> JsonResult {
     let config = MixerConfig {
         name: mixer.name,
         video: mixer.video,
@@ -45,53 +42,20 @@ pub async fn create(
     };
 
     match mixers.lock().await.mixer_create(config) {
-        Ok(_) => Ok(warp::reply::with_status(
-            warp::reply::json(&super::Response {
-                message: "Mixer created".to_string(),
-            }),
-            StatusCode::CREATED,
-        )),
-        Err(e) => match e {
-            super::Error::Exists => Ok(warp::reply::with_status(
-                warp::reply::json(&super::Response {
-                    message: format!("{}", e),
-                }),
-                StatusCode::INTERNAL_SERVER_ERROR,
-            )),
-            e => Ok(warp::reply::with_status(
-                warp::reply::json(&super::Response {
-                    message: format!("{}", e),
-                }),
-                StatusCode::INTERNAL_SERVER_ERROR,
-            )),
-        },
+        Ok(_) => message_response("Mixer created.", StatusCode::CREATED),
+        Err(e) => error(e),
     }
 }
 
-pub async fn get(
-    name: String,
-    mixers: Arc<Mutex<super::Mixers>>,
-) -> Result<impl warp::Reply, Infallible> {
+pub async fn get(name: String, mixers: Arc<Mutex<super::Mixers>>) -> JsonResult {
     let mixers = mixers.lock().await;
-    let mixer = mixers.mixers.get(name.as_str());
-    match mixer {
-        Some(m) => {
-            let mixer = &Mixer {
-                name: m.name(),
-                input_count: m.input_count(),
-                output_count: m.output_count(),
-            };
-            Ok(warp::reply::with_status(
-                warp::reply::json(&mixer),
-                StatusCode::OK,
-            ))
-        }
-        None => Ok(warp::reply::with_status(
-            warp::reply::json(&super::Response {
-                message: "Mixer not found".to_string(),
-            }),
-            StatusCode::NOT_FOUND,
-        )),
+    match mixers.mixers.get(name.as_str()) {
+        Some(m) => okay(&Mixer {
+            name: m.name(),
+            input_count: m.input_count(),
+            output_count: m.output_count(),
+        }),
+        None => message_response("Mixer not found", StatusCode::NOT_FOUND),
     }
 }
 
@@ -100,19 +64,16 @@ pub async fn debug(
     mixers: Arc<Mutex<super::Mixers>>,
 ) -> Result<warp::reply::Response, Infallible> {
     let mixers = mixers.lock().await;
-    let mixer = mixers.mixers.get(name.as_str());
+    let mixer = match mixers.mixers.get(name.as_str()) {
+        Some(m) => m,
+        None => {
+            return Ok(
+                reply::with_status(reply::json(&"Mixer not found"), StatusCode::NOT_FOUND)
+                    .into_response(),
+            )
+        }
+    };
 
-    if mixer.is_none() {
-        let mut response = warp::reply::json(&super::Response {
-            message: "Mixer not found".to_string(),
-        })
-        .into_response();
-        *response.status_mut() = StatusCode::NOT_FOUND;
-
-        return Ok(response);
-    }
-
-    let mixer = mixer.unwrap();
     let mut cmd = Command::new("dot")
         .arg("-Tsvg")
         .stdin(Stdio::piped())
@@ -126,15 +87,11 @@ pub async fn debug(
         .expect("Failed to write to stdin");
 
     let output = cmd.wait_with_output().expect("Failed to read stdout");
-    Ok(warp::reply::with_header(
-        String::from_utf8(output.stdout).unwrap(),
-        "Content-Type",
-        "image/svg+xml",
-    )
-    .into_response())
+    let output = String::from_utf8_lossy(&output.stdout).into_owned();
+    Ok(warp::reply::with_header(output, "Content-Type", "image/svg+xml").into_response())
 }
 
-pub async fn list(mixers: Arc<Mutex<super::Mixers>>) -> Result<impl warp::Reply, Infallible> {
+pub async fn list(mixers: Arc<Mutex<super::Mixers>>) -> JsonResult {
     let mixers: Vec<Mixer> = mixers
         .lock()
         .await
@@ -146,5 +103,5 @@ pub async fn list(mixers: Arc<Mutex<super::Mixers>>) -> Result<impl warp::Reply,
             output_count: m.output_count(),
         })
         .collect();
-    Ok(warp::reply::json(&mixers))
+    okay(&mixers)
 }

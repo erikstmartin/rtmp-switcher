@@ -1,6 +1,6 @@
 use super::Config;
-use crate::gst_create_element;
-use crate::Result;
+use crate::mixer::Error as MixerError;
+use crate::{gst_create_element, Result};
 
 use gst::prelude::*;
 use gstreamer as gst;
@@ -48,7 +48,7 @@ impl Test {
             .field("height", &config.video.height)
             .field("format", &config.video.format.to_string())
             .build();
-        video_capsfilter.set_property("caps", &video_caps).unwrap();
+        video_capsfilter.set_property("caps", &video_caps)?;
 
         let audio = gst_create_element(
             "audiotestsrc",
@@ -133,17 +133,19 @@ impl Test {
         super::release_request_pad(&self.audio)?;
         super::release_request_pad(&self.video)?;
 
-        self.pipeline.as_ref().unwrap().remove_many(&[
-            &self.video,
-            &self.video_convert,
-            &self.video_scale,
-            &self.video_rate,
-            &self.video_capsfilter,
-            &self.audio,
-            &self.audio_convert,
-            &self.audio_resample,
-            &self.audio_queue,
-        ])?;
+        if let Some(pipeline) = self.pipeline.as_ref() {
+            pipeline.remove_many(&[
+                &self.video,
+                &self.video_convert,
+                &self.video_scale,
+                &self.video_rate,
+                &self.video_capsfilter,
+                &self.audio,
+                &self.audio_convert,
+                &self.audio_resample,
+                &self.audio_queue,
+            ])?;
+        }
         Ok(())
     }
 
@@ -166,7 +168,12 @@ impl Test {
 
     pub fn set_zorder(&mut self, zorder: u32, _update_config: bool) -> Result<()> {
         super::set_peer_pad_property(
-            &self.video_capsfilter.get_static_pad("src").unwrap(),
+            &self
+                .video_capsfilter
+                .get_static_pad("src")
+                .ok_or(MixerError::Gstreamer(
+                    "Failed to get static src pad".to_string(),
+                ))?,
             "zorder",
             &zorder,
         )?;

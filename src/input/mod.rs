@@ -2,8 +2,7 @@ pub mod fake;
 pub mod test;
 pub mod uri;
 
-use crate::Result;
-use crate::{AudioConfig, VideoConfig};
+use crate::{mixer::Error as MixerError, AudioConfig, Result, VideoConfig};
 pub use fake::Fake;
 use serde::{Deserialize, Serialize};
 pub use test::Test;
@@ -158,19 +157,27 @@ impl Input {
 }
 
 fn set_peer_pad_property(pad: &gst::Pad, property: &str, value: &dyn ToValue) -> Result<()> {
-    let peer_pad = pad.get_peer().unwrap();
+    let peer_pad = pad
+        .get_peer()
+        .ok_or_else(|| MixerError::Gstreamer("Could not retrieve peer pad".to_string()))?;
 
     peer_pad.set_property(property, value)?;
     Ok(())
 }
 
 fn release_request_pad(elem: &gst::Element) -> Result<()> {
-    let pad = elem.get_static_pad("src").unwrap();
+    let pad = elem.get_static_pad("src").ok_or_else(|| {
+        MixerError::Gstreamer("Failed to get static src pad for element".to_string())
+    })?;
     if pad.is_linked() {
-        let peer_pad = pad.get_peer().unwrap();
+        let peer_pad = pad.get_peer().ok_or_else(|| {
+            MixerError::Gstreamer("Could not retrieve peer pad for src element".to_string())
+        })?;
         peer_pad
             .get_parent_element()
-            .unwrap()
+            .ok_or_else(|| {
+                MixerError::Gstreamer("Failed to get parent element for peer pad".to_string())
+            })?
             .release_request_pad(&peer_pad);
     }
 

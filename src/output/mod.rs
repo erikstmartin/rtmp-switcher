@@ -3,8 +3,10 @@ pub mod fake;
 pub mod file;
 pub mod rtmp;
 
+use crate::mixer::Error as MixerError;
 use crate::Result;
 use crate::{AudioConfig, AudioEncoderConfig, Mux, VideoConfig, VideoEncoderConfig};
+
 pub use auto::Auto;
 pub use fake::Fake;
 pub use file::File;
@@ -126,12 +128,18 @@ impl Output {
 }
 
 fn release_request_pad(elem: &gst::Element) -> Result<()> {
-    let pad = elem.get_static_pad("sink").unwrap();
+    let pad = elem.get_static_pad("sink").ok_or_else(|| {
+        MixerError::Gstreamer("Failed to get static sink pad for element".to_string())
+    })?;
     if pad.is_linked() {
-        let peer_pad = pad.get_peer().unwrap();
+        let peer_pad = pad.get_peer().ok_or_else(|| {
+            MixerError::Gstreamer("Could not retrieve peer pad for sink element".to_string())
+        })?;
         peer_pad
             .get_parent_element()
-            .unwrap()
+            .ok_or_else(|| {
+                MixerError::Gstreamer("Failed to get parent element for peer pad".to_string())
+            })?
             .release_request_pad(&peer_pad);
     }
 

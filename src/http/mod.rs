@@ -79,6 +79,7 @@ pub async fn recover(err: Rejection) -> Result<impl Reply, Rejection> {
                     MixerError::Exists(_, _) => StatusCode::BAD_REQUEST,
                     MixerError::Unknown => StatusCode::INTERNAL_SERVER_ERROR,
                     MixerError::NotFound(_, _) => StatusCode::NOT_FOUND,
+                    MixerError::System(_) => StatusCode::INTERNAL_SERVER_ERROR,
                     MixerError::GstBool(_)
                     | MixerError::GstStateChange(_)
                     | MixerError::Gstreamer(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -157,7 +158,7 @@ impl Mixers {
     }
 
     pub fn mixer_create(&mut self, config: MixerConfig) -> Result<(), Error> {
-        let re = Regex::new(r"^[a-zA-Z0-9-_]+$").unwrap();
+        let re = Regex::new(r"^[a-zA-Z0-9-_]+$").map_err(|_| Error::Unknown)?;
         if !re.is_match(config.name.as_str()) {
             return Err(Error::InvalidName);
         }
@@ -218,8 +219,10 @@ mod tests {
     use warp::test::request;
 
     fn setup_server() -> Server {
-        gst::init().unwrap();
-        Server::new()
+        match gst::init() {
+            Ok(_) => Server::new(),
+            Err(e) => tracing::error!(e),
+        }
     }
 
     #[tokio::test]

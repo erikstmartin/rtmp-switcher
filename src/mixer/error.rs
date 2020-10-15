@@ -6,6 +6,9 @@ pub enum Error {
     #[error("unknown error")]
     Unknown,
 
+    #[error("{0}")]
+    System(String),
+
     #[error("a {0} with the name '{1}' was not found")]
     NotFound(String, String),
 

@@ -1,10 +1,6 @@
 mod error;
 
-use crate::gst_create_element;
-pub use crate::input;
-pub use crate::output;
-use crate::Result;
-use crate::{AudioConfig, VideoConfig};
+use crate::{gst_create_element, input, output, AudioConfig, Result, VideoConfig};
 pub use error::Error;
 use gst::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -155,11 +151,10 @@ impl Mixer {
             return Err(Error::NotFound("input".to_string(), name.to_string()));
         }
 
-        let mixer_name = self.name();
         let input = self
             .inputs
             .get_mut(name)
-            .ok_or(Error::NotFound(mixer_name, name.to_string()))?;
+            .ok_or_else(|| Error::NotFound("mixer".to_string(), name.to_string()))?;
         input.set_state(gst::State::Null)?;
         input.unlink()?;
         self.inputs.remove(name);
@@ -195,11 +190,10 @@ impl Mixer {
             return Err(Error::NotFound("output".to_string(), name.to_string()));
         }
 
-        let mixer_name = self.name();
         let output = self
             .outputs
             .get_mut(name)
-            .ok_or(Error::NotFound(mixer_name, name.to_string()))?;
+            .ok_or_else(|| Error::NotFound("mixer".to_string(), name.to_string()))?;
         output.set_state(gst::State::Null)?;
         output.unlink()?;
         self.outputs.remove(name);
@@ -246,17 +240,10 @@ impl Mixer {
             return Err(Error::NotFound("input".to_string(), name.to_string()));
         }
 
-        let mixer_name = self.name();
         let input = self
             .inputs
             .get_mut(name)
-            .ok_or_else(|| Error::NotFound(mixer_name, name.to_string()))?;
-
-        // TODO: Find the pad on the compositor that is associated with this input
-        // - Update properties on that pad
-        //
-        // TODO: Find the volume element associated with this input
-        // - Update volume
+            .ok_or_else(|| Error::NotFound("mixer".to_string(), name.to_string()))?;
 
         input.set_zorder(1000, false)?;
         input.set_xpos(0, false)?;
@@ -271,8 +258,8 @@ impl Mixer {
         for (n, input) in self.inputs.iter_mut() {
             if n != name {
                 input.set_volume(0.0, false)?;
-                // TODO: We don't want this unwrap.
-                input.set_zorder(input_config.video.zorder.unwrap(), false)?;
+                // zorder should never be empty, we default it in the config.
+                input.set_zorder(input_config.video.zorder.unwrap_or(0), false)?;
             }
         }
 

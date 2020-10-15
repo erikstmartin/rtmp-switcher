@@ -49,10 +49,9 @@ impl Fake {
         super::release_request_pad(&self.audio)?;
         super::release_request_pad(&self.video)?;
 
-        self.pipeline
-            .as_ref()
-            .unwrap()
-            .remove_many(&[&self.audio, &self.video])?;
+        if let Some(pipeline) = self.pipeline.as_ref() {
+            pipeline.remove_many(&[&self.audio, &self.video])?;
+        }
         Ok(())
     }
 
