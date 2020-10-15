@@ -211,17 +211,25 @@ impl Mixers {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::http::input::CreateRequest as InputCreateRequest;
-    use crate::http::mixer::CreateRequest as MixerCreateRequest;
-    use crate::http::output::CreateRequest as OutputCreateRequest;
-    use crate::mixer;
-    use warp::http::StatusCode;
-    use warp::test::request;
+    use crate::{
+        http::{
+            input::CreateRequest as InputCreateRequest, mixer::CreateRequest as MixerCreateRequest,
+            output::CreateRequest as OutputCreateRequest,
+        },
+        input::Input,
+        mixer,
+        output::{Config as OutputConfig, EncoderConfig, Output},
+        AudioConfig, VideoConfig,
+    };
+    use warp::{http::StatusCode, test::request};
 
     fn setup_server() -> Server {
         match gst::init() {
             Ok(_) => Server::new(),
-            Err(e) => tracing::error!(e),
+            Err(_) => {
+                tracing::error!("Failed to initialize gstreamer");
+                panic!("Failed to initialize gstreamer");
+            }
         }
     }
 
@@ -235,8 +243,8 @@ mod tests {
             .path("/mixers")
             .json(&MixerCreateRequest {
                 name: "test_mixer_create".to_string(),
-                video: Some(mixer::default_video_config()),
-                audio: Some(mixer::default_audio_config()),
+                video: VideoConfig::default(),
+                audio: AudioConfig::default(),
             })
             .reply(&api)
             .await;
@@ -250,7 +258,8 @@ mod tests {
         let mut server = setup_server();
         let config = MixerConfig {
             name: "test_mixer_list".to_string(),
-            ..mixer::default_config()
+            audio: AudioConfig::default(),
+            video: VideoConfig::default(),
         };
         server
             .mixer_create(config)
@@ -269,7 +278,8 @@ mod tests {
         let mut server = setup_server();
         let config = MixerConfig {
             name: "test_mixer_get".to_string(),
-            ..mixer::default_config()
+            audio: AudioConfig::default(),
+            video: VideoConfig::default(),
         };
         server
             .mixer_create(config)
@@ -292,7 +302,8 @@ mod tests {
         let mut server = setup_server();
         let config = MixerConfig {
             name: "test_mixer_debug".to_string(),
-            ..mixer::default_config()
+            audio: AudioConfig::default(),
+            video: VideoConfig::default(),
         };
         server
             .mixer_create(config)
@@ -315,7 +326,8 @@ mod tests {
         let mut server = setup_server();
         let config = MixerConfig {
             name: "test_input_list".to_string(),
-            ..mixer::default_config()
+            audio: AudioConfig::default(),
+            video: VideoConfig::default(),
         };
         server
             .mixer_create(config)
@@ -338,7 +350,8 @@ mod tests {
         let mut server = setup_server();
         let config = MixerConfig {
             name: "test_input_add".to_string(),
-            ..mixer::default_config()
+            audio: AudioConfig::default(),
+            video: VideoConfig::default(),
         };
         server
             .mixer_create(config)
@@ -353,9 +366,9 @@ mod tests {
                 name: "test".to_string(),
                 input_type: "URI".to_string(),
                 location: "http://nowhere".to_string(),
-                video: Some(mixer::default_video_config()),
-                audio: Some(mixer::default_audio_config()),
-                record: Some(false),
+                audio: AudioConfig::default(),
+                video: VideoConfig::default(),
+                record: false,
             })
             .reply(&api)
             .await;
@@ -381,7 +394,8 @@ mod tests {
         let mut server = setup_server();
         let config = MixerConfig {
             name: mixer_name.to_string(),
-            ..mixer::default_config()
+            audio: AudioConfig::default(),
+            video: VideoConfig::default(),
         };
         server
             .mixer_create(config)
@@ -390,15 +404,15 @@ mod tests {
 
         let input_config = crate::input::Config {
             name: "fakesrc".to_string(),
-            audio: mixer::default_audio_config(),
-            video: mixer::default_video_config(),
+            audio: AudioConfig::default(),
+            video: VideoConfig::default(),
             record: false,
         };
 
         server
             .input_add(
                 mixer_name,
-                mixer::input::Input::create_fake(input_config).expect("failed to create fakesrc"),
+                Input::create_fake(input_config).expect("failed to create fakesrc"),
             )
             .await
             .expect("Failed to add input");
@@ -421,7 +435,8 @@ mod tests {
         let mut server = setup_server();
         let config = MixerConfig {
             name: mixer_name.to_string(),
-            ..mixer::default_config()
+            audio: AudioConfig::default(),
+            video: VideoConfig::default(),
         };
         server
             .mixer_create(config)
@@ -430,15 +445,15 @@ mod tests {
 
         let input_config = crate::input::Config {
             name: "fakesrc".to_string(),
-            audio: mixer::default_audio_config(),
-            video: mixer::default_video_config(),
+            audio: AudioConfig::default(),
+            video: VideoConfig::default(),
             record: false,
         };
 
         server
             .input_add(
                 mixer_name,
-                mixer::input::Input::create_fake(input_config).expect("failed to create fakesrc"),
+                Input::create_fake(input_config).expect("failed to create fakesrc"),
             )
             .await
             .expect("Failed to add input");
@@ -471,7 +486,8 @@ mod tests {
         let mut server = setup_server();
         let config = MixerConfig {
             name: "test_output_list".to_string(),
-            ..mixer::default_config()
+            audio: AudioConfig::default(),
+            video: VideoConfig::default(),
         };
         server
             .mixer_create(config)
@@ -494,7 +510,8 @@ mod tests {
         let mut server = setup_server();
         let config = MixerConfig {
             name: "test_output_add".to_string(),
-            ..mixer::default_config()
+            audio: AudioConfig::default(),
+            video: VideoConfig::default(),
         };
         server
             .mixer_create(config)
@@ -509,6 +526,9 @@ mod tests {
                 name: "test".to_string(),
                 output_type: "Fake".to_string(),
                 location: "http://nowhere".to_string(),
+                audio: AudioConfig::default(),
+                video: VideoConfig::default(),
+                encoder: EncoderConfig::default(),
             })
             .reply(&api)
             .await;
@@ -534,16 +554,26 @@ mod tests {
         let mut server = setup_server();
         let config = MixerConfig {
             name: mixer_name.to_string(),
-            ..mixer::default_config()
+            audio: AudioConfig::default(),
+            video: VideoConfig::default(),
         };
         server
             .mixer_create(config)
             .await
             .expect("failed to create mixer");
+
+        let output_config = OutputConfig {
+            name: "fake".to_string(),
+            audio: AudioConfig::default(),
+            video: VideoConfig::default(),
+            encoder: EncoderConfig::default(),
+            mux: None,
+        };
+
         server
             .output_add(
                 mixer_name,
-                mixer::output::Output::create_fake("fake").expect("failed to create fake output"),
+                Output::create_fake(output_config).expect("failed to create fake output"),
             )
             .await
             .expect("Failed to add output");
@@ -566,16 +596,26 @@ mod tests {
         let mut server = setup_server();
         let config = MixerConfig {
             name: mixer_name.to_string(),
-            ..mixer::default_config()
+            audio: AudioConfig::default(),
+            video: VideoConfig::default(),
         };
         server
             .mixer_create(config)
             .await
             .expect("failed to create mixer");
+
+        let output_config = OutputConfig {
+            name: "fake".to_string(),
+            audio: AudioConfig::default(),
+            video: VideoConfig::default(),
+            encoder: EncoderConfig::default(),
+            mux: None,
+        };
+
         server
             .output_add(
                 mixer_name,
-                mixer::output::Output::create_fake("fake").expect("failed to create fake output"),
+                Output::create_fake(output_config).expect("failed to create fake output"),
             )
             .await
             .expect("Failed to add output");
