@@ -51,11 +51,12 @@ impl Mixer {
         )?;
         let video_caps = gst::Caps::builder("video/x-raw")
             .field("framerate", &gst::Fraction::new(config.video.framerate, 1))
-            .field("format", &format!("{}", config.video.format))
+            .field("format", &config.video.format.to_string())
             .field("width", &config.video.width)
             .field("height", &config.video.height)
             .build();
-        video_capsfilter.set_property("caps", &video_caps).unwrap();
+
+        video_capsfilter.set_property("caps", &video_caps)?;
 
         let video_queue = gst_create_element(
             "queue",
@@ -86,7 +87,7 @@ impl Mixer {
             .field("layout", &"interleaved")
             .field("format", &"S32LE")
             .build();
-        audio_capsfilter.set_property("caps", &audio_caps).unwrap();
+        audio_capsfilter.set_property("caps", &audio_caps)?;
 
         let audio_tee =
             gst_create_element("tee", format!("mixer_{}_audio_tee", config.name).as_str())?;
@@ -154,7 +155,11 @@ impl Mixer {
             return Err(Error::NotFound("input".to_string(), name.to_string()));
         }
 
-        let input = self.inputs.get_mut(name).unwrap();
+        let mixer_name = self.name();
+        let input = self
+            .inputs
+            .get_mut(name)
+            .ok_or(Error::NotFound(mixer_name, name.to_string()))?;
         input.set_state(gst::State::Null)?;
         input.unlink()?;
         self.inputs.remove(name);
@@ -190,7 +195,11 @@ impl Mixer {
             return Err(Error::NotFound("output".to_string(), name.to_string()));
         }
 
-        let output = self.outputs.get_mut(name).unwrap();
+        let mixer_name = self.name();
+        let output = self
+            .outputs
+            .get_mut(name)
+            .ok_or(Error::NotFound(mixer_name, name.to_string()))?;
         output.set_state(gst::State::Null)?;
         output.unlink()?;
         self.outputs.remove(name);
@@ -237,8 +246,11 @@ impl Mixer {
             return Err(Error::NotFound("input".to_string(), name.to_string()));
         }
 
-        // TODO: Fix this!!
-        let input = self.inputs.get_mut(name).unwrap();
+        let mixer_name = self.name();
+        let input = self
+            .inputs
+            .get_mut(name)
+            .ok_or_else(|| Error::NotFound(mixer_name, name.to_string()))?;
 
         input.set_zorder(1000)?;
         input.set_xpos(0)?;
