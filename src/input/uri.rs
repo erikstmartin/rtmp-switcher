@@ -305,13 +305,13 @@ impl URI {
         let prop = self
             .video_queue
             .get_static_pad("src")
-            .ok_or(mixer::Error::Gstreamer(
-                "Failed to retrieve src pad for video_queue".to_string(),
-            ))?
+            .ok_or_else(|| {
+                mixer::Error::Gstreamer("Failed to retrieve src pad for video_queue".to_string())
+            })?
             .get_peer()
-            .ok_or(mixer::Error::Gstreamer(
-                "Failed to retrieve peer pad for video_queue".to_string(),
-            ))?
+            .ok_or_else(|| {
+                mixer::Error::Gstreamer("Failed to retrieve peer pad for video_queue".to_string())
+            })?
             .get_property("zorder")?;
         let zorder = prop.downcast::<u32>().map_err(|_| mixer::Error::Unknown)?;
         self.config.video.zorder = Some(zorder.get_some());
@@ -375,9 +375,7 @@ impl URI {
             &self
                 .video_queue
                 .get_static_pad("src")
-                .ok_or(mixer::Error::Gstreamer(
-                    "failed to retrieve src pad".to_string(),
-                ))?,
+                .ok_or_else(|| mixer::Error::Gstreamer("failed to retrieve src pad".to_string()))?,
             "zorder",
             &zorder,
         )?;
@@ -393,9 +391,7 @@ impl URI {
             &self
                 .video_queue
                 .get_static_pad("src")
-                .ok_or(mixer::Error::Gstreamer(
-                    "failed to retrieve src pad".to_string(),
-                ))?,
+                .ok_or_else(|| mixer::Error::Gstreamer("failed to retrieve src pad".to_string()))?,
             "width",
             &width,
         )?;
@@ -411,9 +407,7 @@ impl URI {
             &self
                 .video_queue
                 .get_static_pad("src")
-                .ok_or(mixer::Error::Gstreamer(
-                    "failed to retrieve src pad".to_string(),
-                ))?,
+                .ok_or_else(|| mixer::Error::Gstreamer("failed to retrieve src pad".to_string()))?,
             "height",
             &height,
         )?;
@@ -429,9 +423,7 @@ impl URI {
             &self
                 .video_queue
                 .get_static_pad("src")
-                .ok_or(mixer::Error::Gstreamer(
-                    "failed to retrieve src pad".to_string(),
-                ))?,
+                .ok_or_else(|| mixer::Error::Gstreamer("failed to retrieve src pad".to_string()))?,
             "xpos",
             &xpos,
         )?;
@@ -447,9 +439,7 @@ impl URI {
             &self
                 .video_queue
                 .get_static_pad("src")
-                .ok_or(mixer::Error::Gstreamer(
-                    "failed to retrieve src pad".to_string(),
-                ))?,
+                .ok_or_else(|| mixer::Error::Gstreamer("failed to retrieve src pad".to_string()))?,
             "ypos",
             &ypos,
         )?;
@@ -465,9 +455,7 @@ impl URI {
             &self
                 .video_queue
                 .get_static_pad("src")
-                .ok_or(mixer::Error::Gstreamer(
-                    "failed to retrieve src pad".to_string(),
-                ))?,
+                .ok_or_else(|| mixer::Error::Gstreamer("failed to retrieve src pad".to_string()))?,
             "alpha",
             &alpha,
         )?;

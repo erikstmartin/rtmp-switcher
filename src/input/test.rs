@@ -171,9 +171,7 @@ impl Test {
             &self
                 .video_capsfilter
                 .get_static_pad("src")
-                .ok_or(MixerError::Gstreamer(
-                    "Failed to get static src pad".to_string(),
-                ))?,
+                .ok_or_else(|| MixerError::Gstreamer("Failed to get static src pad".to_string()))?,
             "zorder",
             &zorder,
         )?;

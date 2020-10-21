@@ -76,9 +76,7 @@ impl Fake {
             &self
                 .video
                 .get_static_pad("src")
-                .ok_or(MixerError::Gstreamer(
-                    "failed to retrieve src pad".to_string(),
-                ))?,
+                .ok_or_else(|| MixerError::Gstreamer("failed to retrieve src pad".to_string()))?,
             "zorder",
             &zorder,
         )?;
